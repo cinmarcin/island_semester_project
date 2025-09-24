@@ -20,7 +20,7 @@ def print(*args, **kwargs):
     original_print(f"{BLUE}[{func_name}] {msg}{RESET}", **kwargs)
 
 ## Paths
-FMRI_PREP_OUTPUT_PATH = '../../../../media/RCPNAS/Data3/Alison_island/new_data/fmriprep_output'
+FMRI_PREP_OUTPUT_PATH = 'data/raw/'
 EVENTS_PATH = '../../../../media/RCPNAS/Data3/Alison_island/bids_ackbar'
 
 def load_subject_data(sub, ses):
@@ -48,7 +48,7 @@ def load_subject_data(sub, ses):
 
     func_file = os.path.join(FMRI_PREP_OUTPUT_PATH, sub, ses, 'func', f'{sub}_{ses}_{task}_{run}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz')
     confounds_file = os.path.join(FMRI_PREP_OUTPUT_PATH, sub, ses, 'func', f'{sub}_{ses}_{task}_{run}_desc-confounds_timeseries.tsv')
-    events_file = os.path.join(EVENTS_PATH, sub, ses, 'func', f'{sub}_{ses}_{task}_{run}_events.tsv')
+    events_file = os.path.join(FMRI_PREP_OUTPUT_PATH, sub, ses, 'func', f'{sub}_{ses}_{task}_{run}_events.tsv')
     meta_data_file = os.path.join(FMRI_PREP_OUTPUT_PATH, sub, ses, 'func', f'{sub}_{ses}_{task}_{run}_space-MNI152NLin2009cAsym_desc-preproc_bold.json')
 
     # Load files

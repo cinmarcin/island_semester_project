@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=run_glm           # Name of the job
+#SBATCH --job-name=run_rsa           # Name of the job
 #SBATCH --time=16:00:00
 #SBATCH --account=cs-503
 #SBATCH --qos=cs-503
 #SBATCH --gres=gpu:2                  # Request 2 GPUs
 #SBATCH --mem=64G
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1               # Adjust CPU allocation if needed
-#SBATCH --output=logs/interactive_job.out    # Output log file
-#SBATCH --error=logs/interactive_job.err     # Error log file
+#SBATCH --cpus-per-task=8              # Adjust CPU allocation if needed
+#SBATCH --output=logs/rsa_job.out    # Output log file
+#SBATCH --error=logs/rsa_job.err     # Error log file
 
 cd ~/island_semester_project
 

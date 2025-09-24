@@ -127,7 +127,7 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     # Preprocess post
     post_events = events_list[1]
     post_events['onset'] += pre_duration  # shift onsets forward
-    post_events = events_to_stimuli(post_events)
+    post_events = events_to_stimuli(post_events, )
     post_events = contrast_type.preprocess_stimuli(post_events, run_label='post')
 
     # Concatenate events
@@ -142,6 +142,7 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     # Create design matrix
     design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
 
+    print(design_matrix.columns)
     # Create mask
     gm_mask_img = create_gm_mask(fmri_data)
 
@@ -151,9 +152,54 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     fmri_glm = fmri_glm.fit(fmri_data, design_matrices=design_matrix)
     print("Fitted FirstLevelModel.")
 
-    return fmri_glm
+    contrast_vec = contrast_type.get_vector(design_matrix, combined=True)
+    # take the last element of the dict if multiple contrasts are returned
+    if isinstance(contrast_vec, dict):
+        contrast_vec = list(contrast_vec.values())[-1]
+    contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
 
-def second_level_analysis(contrast_maps, height_control, alpha, save_path):
+    return fmri_glm, contrast
+
+def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, title=None):
+    """
+    Perform first-level GLM analysis on single fMRI data.
+    Args:
+        fmri_data (nibabel.Nifti1Image): 4D fMRI data image.
+        events (pandas.DataFrame): DataFrame containing event information.
+        metadata (dict): Metadata dictionary containing at least the "RepetitionTime" key.
+        confounds (pandas.DataFrame): DataFrame containing confound time series.
+        contrast_type (ContrastType): Type of contrast to compute.
+        smoothing_fwhm (float): Smoothing FWHM in mm.
+    Returns:
+        fmri_glm (FirstLevelModel): Fitted FirstLevelModel object.
+        contrast (nibabel.Nifti1Image): Contrast image for the specified contrast type.
+    """
+    print("Starting first-level analysis...")
+    n_scans = fmri_data.shape[3]
+
+    # Preprocess events
+    events = events_to_stimuli(events)
+    events = contrast_type.preprocess_stimuli(events)
+
+    # Create design matrix
+    design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
+
+    # Create mask
+    gm_mask_img = create_gm_mask(fmri_data)
+
+    # Fit GLM
+    fmri_glm = FirstLevelModel(mask_img=gm_mask_img, smoothing_fwhm=smoothing_fwhm, n_jobs=-1)
+    print("Fitting FirstLevelModel...")
+    fmri_glm = fmri_glm.fit(fmri_data, design_matrices=design_matrix)
+    print("Fitted FirstLevelModel.")
+    # Define contrast
+    contrast_vec = contrast_type.get_vector(design_matrix)
+    contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
+    print(f"Computed contrast for {contrast_type}.")
+
+    return fmri_glm, contrast
+
+def group_level_analysis(contrast_maps, height_control, alpha, save_path):
     """
     Perform second-level GLM analysis.
     Args:
@@ -173,4 +219,26 @@ def second_level_analysis(contrast_maps, height_control, alpha, save_path):
     report = make_glm_report(second_level_model, 'intercept', height_control=height_control, alpha=alpha)
     report.save_as_html(save_path)
     print(f"Saved second-level GLM report to {save_path}")
+    return second_level_model, second_level_contrast
+
+def pre_vs_post_second_level_analysis(pre_contrasts, post_contrasts):
+    """
+    Perform second-level GLM analysis comparing pre and post contrasts.
+    Args:
+        pre_contrasts (list of nibabel.Nifti1Image): List of pre-session contrast images from first-level.
+        post_contrasts (list of nibabel.Nifti1Image): List of post-session contrast images from first-level.
+    Returns:
+        second_level_model (SecondLevelModel): Fitted SecondLevelModel object.
+        second_level_contrast (nibabel.Nifti1Image): Contrast image for the second-level analysis.
+    """
+    pre_contrasts = [pre_contrasts]
+    post_contrasts = [post_contrasts]
+    all_contrasts = pre_contrasts + post_contrasts
+
+    design_matrix = pd.DataFrame({
+        "intercept": [1] * len(all_contrasts),
+        "session": [0] * len(pre_contrasts) + [1] * len(post_contrasts)
+    })
+    second_level_model = SecondLevelModel().fit(all_contrasts, design_matrix=design_matrix)
+    second_level_contrast = second_level_model.compute_contrast(second_level_contrast='session', output_type='z_score')    
     return second_level_model, second_level_contrast
