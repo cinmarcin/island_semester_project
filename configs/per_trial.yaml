@@ -1,0 +1,6 @@
+# General GLM settings
+
+contrast_type: per_trial       # options: old_vs_new, pre_vs_post, etc.
+smoothing_fwhm: null            # in mm, null means no smoothing
+height_control: bonferroni      # or fdr
+p_value: 0.05                   # significance threshold

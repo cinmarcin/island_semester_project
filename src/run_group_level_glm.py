@@ -1,18 +1,19 @@
 from contrast_types import ContrastType
 import os
-from joblib import dump, load
 from nilearn.glm.second_level import SecondLevelModel, make_second_level_design_matrix
 from nilearn.reporting import make_glm_report
-import pandas as pd
+from nilearn import image
 
 
 ## Controls
-CONTRAST_TYPE = ContrastType.OLD_VS_NEW
+CONTRAST_TYPE = ContrastType.RELEVANCE_VS_IRRELEVANCE
 SMOOTHING_FWHM = None # in mm
 HEIGHT_CONTROL = "bonferroni"  # "fdr" or "bonferroni"
 P_VALUE = 0.05
 
-CONTRAST_PATH_ENDING = f'_second_level_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_contrast.pkl'
+CONTRAST_PATH_ENDINGS= [f'_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz',
+                        f'_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz',
+                        f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz']
 DATA_PATH = f'data/processed/glm/{CONTRAST_TYPE.value}'
 REPORT_PATH = f"reports/glm/{CONTRAST_TYPE.value}/group_level"
 if not os.path.exists(REPORT_PATH):
@@ -23,10 +24,10 @@ list_of_subs = [
                 'sub-P12',
                 'sub-P13',
                 'sub-P14',
-        #         'sub-P15',
-        #         'sub-P16',
-        #         'sub-P17',
-        #         'sub-P18',
+                'sub-P15',
+                'sub-P16',
+                'sub-P17',
+                'sub-P18',
         #         'sub-P19',
         #         'sub-P20',
         #         'sub-P21',
@@ -52,26 +53,29 @@ list_of_subs = [
         #         'sub-P50',
         #         'sub-P51',
                 ]
-contrasts = []
-for sub in list_of_subs:
-    SUBJECT_FOLDER = os.path.join(DATA_PATH, sub)
-    CONTRAST_PATH = os.path.join(SUBJECT_FOLDER, f'{sub}{CONTRAST_PATH_ENDING}')
-    if not os.path.exists(CONTRAST_PATH):
-        raise FileNotFoundError(f"Contrast file not found for {sub} at {CONTRAST_PATH}")
-    print(f"Loading contrast for {sub} from {CONTRAST_PATH}")
-    contrast = load(CONTRAST_PATH)
-    contrasts.append(contrast)
+for CONTRAST_PATH_ENDING in CONTRAST_PATH_ENDINGS:
+    print(f"Processing group-level GLM for: {CONTRAST_PATH_ENDING}")
 
-## Second Level Model
-# The design matrix needs an index for subjects
-design_matrix = make_second_level_design_matrix(subjects_label=list_of_subs)
-second_level_model = SecondLevelModel(smoothing_fwhm=SMOOTHING_FWHM)
-second_level_model.fit(contrasts, design_matrix=design_matrix)
+    contrasts = []
+    for sub in list_of_subs:
+        SUBJECT_FOLDER = os.path.join(DATA_PATH, sub)
+        CONTRAST_PATH = os.path.join(SUBJECT_FOLDER, f'{sub}{CONTRAST_PATH_ENDING}')
+        if not os.path.exists(CONTRAST_PATH):
+            raise FileNotFoundError(f"Contrast file not found for {sub} at {CONTRAST_PATH}")
+        print(f"Loading contrast for {sub} from {CONTRAST_PATH}")
+        contrast = image.load_img(CONTRAST_PATH)
+        contrasts.append(contrast)
 
-# Example: compute group-level contrast (intercept)
-z_map = second_level_model.compute_contrast('intercept', output_type="z_score")
+    ## Second Level Model
+    # The design matrix needs an index for subjects
+    design_matrix = make_second_level_design_matrix(subjects_label=list_of_subs)
+    second_level_model = SecondLevelModel(smoothing_fwhm=SMOOTHING_FWHM)
+    second_level_model.fit(contrasts, design_matrix=design_matrix)
 
-# Generate report
-report = make_glm_report(second_level_model, contrasts="intercept")
+    # Example: compute group-level contrast (intercept)
+    z_map = second_level_model.compute_contrast('intercept', output_type="z_score")
 
-report.save_as_html(os.path.join(REPORT_PATH, f"group_level_{CONTRAST_PATH_ENDING.replace('.pkl', '')}_glm_report.html"))
+    # Generate report
+    report = make_glm_report(second_level_model, contrasts="intercept", height_control=HEIGHT_CONTROL, alpha=P_VALUE)
+
+    report.save_as_html(os.path.join(REPORT_PATH, f"group_level_{HEIGHT_CONTROL}_{CONTRAST_PATH_ENDING.replace('.nii.gz', '')}_glm_report.html"))

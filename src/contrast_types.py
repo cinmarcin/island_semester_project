@@ -9,6 +9,8 @@ class ContrastType(Enum):
     PER_TRIAL = "per_trial"
     ORDER = "order"
 
+
+
     def preprocess_stimuli(self, events: pd.DataFrame, run_label: str = None) -> pd.DataFrame:
         """
         Handle stimuli differently for each contrast and encode pre/post run.

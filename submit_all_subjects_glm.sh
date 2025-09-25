@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=8              # Adjust CPU allocation if needed
 #SBATCH --output=logs/%A_%a.out
 #SBATCH --error=logs/%A_%a.err
-#SBATCH --array=0-8
+#SBATCH --array=0-7
 
 CONFIG_FILE=$1
 
@@ -21,15 +21,13 @@ conda activate miplab_env
 
 
 # List of subjects
-SUBS=(sub-P10 sub-P12 sub-P13 sub-P14 sub-P15 sub-P16 sub-P17 sub-P18 sub-P19)
+SUBS=(sub-P10 sub-P12 sub-P13 sub-P14 sub-P15 sub-P16 sub-P17 sub-P18)
 
 
 
 # Use SLURM_ARRAY_TASK_ID to select subject
 SUBJECT=${SUBS[$SLURM_ARRAY_TASK_ID]}
 
-
-echo "Running GLM for $SUBJECT with config $CONFIG_FILE"
 
 # Run Python script
 python src/run_subject_level_glm.py --sub "$SUBJECT" --config "$CONFIG_FILE"

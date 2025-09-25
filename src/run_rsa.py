@@ -20,10 +20,10 @@ list_of_subs = [
                 'sub-P12',
                 'sub-P13',
                 'sub-P14',
-        #         'sub-P15',
-        #         'sub-P16',
-        #         'sub-P17',
-        #         'sub-P18',
+                'sub-P15',
+                'sub-P16',
+                'sub-P17',
+                'sub-P18',
         #         'sub-P19',
         #         'sub-P20',
         #         'sub-P21',
@@ -63,8 +63,8 @@ for sub in tqdm(list_of_subs):
     print(f"--- Processing subject: {sub}")
     SUBJECT_FOLDER_IN = os.path.join(DATA_INPUT_PATH, sub)
     SUBJECT_FOLDER = os.path.join(DATA_OUTPUT_PATH, sub)
-    PRE_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_pre_smooth_{SMOOTHING_FWHM}_fitted_glm.pkl')
-    POST_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_post_smooth_{SMOOTHING_FWHM}_fitted_glm.pkl')
+    PRE_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_pre_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
+    POST_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_post_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
     if not os.path.exists(SUBJECT_FOLDER):
         os.makedirs(SUBJECT_FOLDER)
 
@@ -109,6 +109,7 @@ for sub in tqdm(list_of_subs):
     print(f"Saved correlation matrices to {pre_correlation_matrix_path} and {post_correlation_matrix_path}")
 
     ## PRE 
+    print("Computing average correlations for PRE...")
     # Compute average correlation within repetitions
     pre_correlation_w_rep = correlation_within_repetitions(pre_correlation_matrix, trial_per_repetition=64, repetitions=6)
     group_level_correlation_within_repetitions.append(pre_correlation_w_rep)
@@ -118,6 +119,7 @@ for sub in tqdm(list_of_subs):
     group_level_correlation_matrices.append(pre_correlation_matrix)
 
     ## POST
+    print("Computing average correlations for POST...")
     # Compute average correlation within repetitions
     post_correlation_w_rep = correlation_within_repetitions(post_correlation_matrix, trial_per_repetition=64, repetitions=6)
     group_level_correlation_within_repetitions.append(post_correlation_w_rep)
@@ -126,10 +128,10 @@ for sub in tqdm(list_of_subs):
     group_level_correlation_accross_repetitions.append(post_correlation_ac_rep)
     group_level_correlation_matrices.append(post_correlation_matrix)
 
-    # Create RDM
-    n_trials = 64 
-    repetitions = 6
-    index_rdm = create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=True)
+    # # Create RDM
+    # n_trials = 64 
+    # repetitions = 6
+    # index_rdm = create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=True)
 
 
 ## Group level analysis
@@ -142,11 +144,11 @@ n_subjects = len(group_level_correlation_within_repetitions) // 2
 
 plt.figure(figsize=(8, 6))
 
-# --- Boxplots ---
+# Boxplots 
 positions = [1, 2]
 plt.boxplot([group_level_correlation_within_repetitions, group_level_correlation_accross_repetitions], positions=positions, widths=0.6)
 
-# --- Individual subject dots + connecting lines ---
+# Individual subject dots + connecting lines 
 cmap = plt.get_cmap('tab20')
 for i in range(n_subjects):
     index = i * 2  # Each subject has two entries: pre and post
@@ -155,13 +157,13 @@ for i in range(n_subjects):
     plt.plot(positions, [group_level_correlation_within_repetitions[index + 1], group_level_correlation_accross_repetitions[index + 1]], 
              marker='o', linestyle='--', color=cmap(i % 20), alpha=0.7)
 
-# --- Formatting ---
+# Formatting 
 plt.xticks(positions, ['Within Repetitions', 'Across Repetitions'])
 plt.ylabel('Correlation')
 plt.title('Group Level Correlation')
 plt.grid(axis='y')
 
-# --- Custom legend ---
+#  Custom legend 
 solid_line = mpatches.Patch(color='black', label='Pre-Viewing', linestyle='-')
 dashed_line = mpatches.Patch(color='black', label='Post-Viewing', linestyle='--')
 plt.legend(handles=[solid_line, dashed_line], loc='upper left')

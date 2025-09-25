@@ -1,7 +1,0 @@
-  0%|          | 0/1 [00:00<?, ?it/s]  0%|          | 0/1 [00:00<?, ?it/s]
-Traceback (most recent call last):
-  File "/home/boesch/island_semester_project/src/run_rsa.py", line 61, in <module>
-    fmri_glm = load(GLM_MODEL_PATH)
-  File "/home/boesch/.local/lib/python3.9/site-packages/joblib/numpy_pickle.py", line 650, in load
-    with open(filename, 'rb') as f:
-FileNotFoundError: [Errno 2] No such file or directory: '../data/processed/glm/order/sub-P10/sub-P10_smooth_None_fitted_glm.pkl'

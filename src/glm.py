@@ -142,7 +142,6 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     # Create design matrix
     design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
 
-    print(design_matrix.columns)
     # Create mask
     gm_mask_img = create_gm_mask(fmri_data)
 
@@ -158,7 +157,17 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
         contrast_vec = list(contrast_vec.values())[-1]
     contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
 
-    return fmri_glm, contrast
+    # CSF Contrast
+    csf_contrast_vec = np.array([1 if 'csf' in c else 0 for c in design_matrix.columns])
+    csf_contrast = fmri_glm.compute_contrast(csf_contrast_vec, output_type='z_score')
+    print("Computed CSF contrast.")
+
+    # White Matter Contrast
+    wm_contrast_vec = np.array([1 if 'white_matter' in c else 0 for c in design_matrix.columns])
+    wm_contrast = fmri_glm.compute_contrast(wm_contrast_vec, output_type='z_score')
+    print("Computed White Matter contrast.")
+
+    return fmri_glm, contrast, csf_contrast, wm_contrast
 
 def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, title=None):
     """
@@ -192,12 +201,23 @@ def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: 
     print("Fitting FirstLevelModel...")
     fmri_glm = fmri_glm.fit(fmri_data, design_matrices=design_matrix)
     print("Fitted FirstLevelModel.")
+
     # Define contrast
     contrast_vec = contrast_type.get_vector(design_matrix)
     contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
     print(f"Computed contrast for {contrast_type}.")
 
-    return fmri_glm, contrast
+    # CSF Contrast
+    csf_contrast_vec = np.array([1 if 'csf' in c else 0 for c in design_matrix.columns])
+    csf_contrast = fmri_glm.compute_contrast(csf_contrast_vec, output_type='z_score')
+    print("Computed CSF contrast.")
+
+    # White Matter Contrast
+    wm_contrast_vec = np.array([1 if 'white_matter' in c else 0 for c in design_matrix.columns])
+    wm_contrast = fmri_glm.compute_contrast(wm_contrast_vec, output_type='z_score')
+    print("Computed White Matter contrast.")
+
+    return fmri_glm, contrast, csf_contrast, wm_contrast
 
 def group_level_analysis(contrast_maps, height_control, alpha, save_path):
     """
