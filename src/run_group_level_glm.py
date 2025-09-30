@@ -6,14 +6,16 @@ from nilearn import image
 
 
 ## Controls
-CONTRAST_TYPE = ContrastType.RELEVANCE_VS_IRRELEVANCE
-SMOOTHING_FWHM = None # in mm
-HEIGHT_CONTROL = "bonferroni"  # "fdr" or "bonferroni"
+CONTRAST_TYPE = ContrastType.OLD_VS_NEW
+SMOOTHING_FWHM = 5 # in mm
+HEIGHT_CONTROL = "fdr"  # "fdr" or "bonferroni"
+HIPPOCAMPUS_ONLY = False
 P_VALUE = 0.05
 
-CONTRAST_PATH_ENDINGS= [f'_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz',
-                        f'_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz',
-                        f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_contrast.nii.gz']
+CONTRAST_PATH_ENDINGS= [f'_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz',
+                        f'_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz',
+                        f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz', 
+                        f'_second_level_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz']
 DATA_PATH = f'data/processed/glm/{CONTRAST_TYPE.value}'
 REPORT_PATH = f"reports/glm/{CONTRAST_TYPE.value}/group_level"
 if not os.path.exists(REPORT_PATH):
@@ -69,10 +71,8 @@ for CONTRAST_PATH_ENDING in CONTRAST_PATH_ENDINGS:
     ## Second Level Model
     # The design matrix needs an index for subjects
     design_matrix = make_second_level_design_matrix(subjects_label=list_of_subs)
-    second_level_model = SecondLevelModel(smoothing_fwhm=SMOOTHING_FWHM)
+    second_level_model = SecondLevelModel(smoothing_fwhm=None)
     second_level_model.fit(contrasts, design_matrix=design_matrix)
-
-    # Example: compute group-level contrast (intercept)
     z_map = second_level_model.compute_contrast('intercept', output_type="z_score")
 
     # Generate report

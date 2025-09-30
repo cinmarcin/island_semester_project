@@ -117,9 +117,9 @@ class ContrastType(Enum):
                 weights = np.array([1 if 'trial' in c else 0 for c in columns])
         elif self == ContrastType.ORDER:
             if combined:
-                weights = {'Baseline' : np.ones(len(columns))}
+                weights = {'Baseline' : np.array([1 if 'trial' in c else 0 for c in columns])}
             else:
-                weights = np.ones(len(columns))
+               weights = np.array([1 if 'trial' in c else 0 for c in columns])
         else:
             raise ValueError(f"No weights defined for {self}")
                 

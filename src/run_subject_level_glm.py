@@ -1,6 +1,6 @@
 import os
-from utils.data import load_subject_data
-from glm import combined_first_level_analysis, first_level_analysis, pre_vs_post_second_level_analysis
+from utils.data import load_subject_data, remove_subject_data
+from glm import combined_first_level_analysis, first_level_analysis, compute_pre_post_contrast
 from nilearn.reporting import make_glm_report
 from joblib import dump, load
 from contrast_types import ContrastType
@@ -24,6 +24,7 @@ CONTRAST_TYPE = ContrastType(config["contrast_type"])
 SMOOTHING_FWHM = config["smoothing_fwhm"]
 HEIGHT_CONTROL = config["height_control"]
 P_VALUE = config["p_value"]
+HIPPOCAMPUS_ONLY = config.get("hippocampus_only", False)
 
 print(f"Running GLM for {SUB} with config {config_file}")
 
@@ -38,10 +39,10 @@ if not os.path.exists(FIGURE_OUTPUT_PATH):
 if not os.path.exists(DATA_OUTPUT_PATH):
     os.makedirs(DATA_OUTPUT_PATH)
 SUBJECT_FOLDER = os.path.join(DATA_OUTPUT_PATH, SUB)
-MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
-PRE_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
-POST_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
-SECOND_LEVEL_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_second_level_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
+MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
+PRE_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
+POST_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
+SECOND_LEVEL_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_second_level_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
 if not os.path.exists(SUBJECT_FOLDER):
     os.makedirs(SUBJECT_FOLDER)
 LOAD_MODELS = os.path.exists(MODEL_PATH) and os.path.exists(PRE_MODEL_PATH) and os.path.exists(POST_MODEL_PATH) and os.path.exists(SECOND_LEVEL_MODEL_PATH)
@@ -65,32 +66,31 @@ else:
     metadata_concat = [pre_metadata, post_metadata]
     
     ## COMBINED Analysis
-    fmri_glm, contrast, csf_contrast, wm_contrast = combined_first_level_analysis(fmri_concat, events_concat, metadata_concat, confounds_concat, CONTRAST_TYPE, SMOOTHING_FWHM)
+    fmri_glm, contrast, csf_contrast, wm_contrast = combined_first_level_analysis(fmri_concat, events_concat, metadata_concat, confounds_concat, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
     dump(fmri_glm, MODEL_PATH)
     contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    csf_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    wm_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
+    # csf_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
+    # wm_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
     print(f"Saved combined model to {MODEL_PATH}")
 
     ## SEPARATE Analysis
-    pre_glm, pre_contrast, pre_csf_contrast, pre_wm_contrast = first_level_analysis(pre_fmri_data, pre_events_df, pre_metadata, pre_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, title=f"Pre Session")
-    post_glm, post_contrast, post_csf_contrast, post_wm_contrast = first_level_analysis(post_fmri_data, post_events_df, post_metadata, post_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, title=f"Post Session")
+    pre_glm, pre_contrast, pre_csf_contrast, pre_wm_contrast = first_level_analysis(pre_fmri_data, pre_events_df, pre_metadata, pre_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
+    post_glm, post_contrast, post_csf_contrast, post_wm_contrast = first_level_analysis(post_fmri_data, post_events_df, post_metadata, post_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
 
     dump(pre_glm, PRE_MODEL_PATH)
     pre_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    pre_csf_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    pre_wm_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
+    # pre_csf_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
+    # pre_wm_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
     dump(post_glm, POST_MODEL_PATH)
     post_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    post_csf_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    post_wm_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
+    # post_csf_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
+    # post_wm_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
     print(f"Saved separate models to {PRE_MODEL_PATH} and {POST_MODEL_PATH}")
 
     ## SECOND LEVEL - PRE vs POST
-    second_level_model, second_level_contrast = pre_vs_post_second_level_analysis(pre_contrast, post_contrast)
-    dump(second_level_model, SECOND_LEVEL_MODEL_PATH)
-    second_level_contrast.to_filename(SECOND_LEVEL_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    print(f"Saved second-level model to {SECOND_LEVEL_MODEL_PATH}")
+    pre_vs_post_contrast = compute_pre_post_contrast(pre_contrast, post_contrast)
+    pre_vs_post_contrast.to_filename(SECOND_LEVEL_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
+    print(f"Saved pre vs post contrast to {SECOND_LEVEL_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz')}")
 
 
 ## Produce Reports
@@ -101,18 +101,19 @@ SUBJECT_REPORT_FOLDER = os.path.join(REPORT_PATH, SUB)
 if not os.path.exists(SUBJECT_REPORT_FOLDER):
     os.makedirs(SUBJECT_REPORT_FOLDER)
 report = make_glm_report(fmri_glm, contrast_vec, height_control=HEIGHT_CONTROL, alpha=P_VALUE)
-report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f"{SUB}_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE}_glm_report.html"))
+report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f'{SUB}_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}glm_report.html'))
 print(f"Saved GLM report to {SUBJECT_REPORT_FOLDER}")
 
 
 # SEPARATE
 pre_report = make_glm_report(pre_glm, CONTRAST_TYPE.get_vector(pre_glm.design_matrices_[0]), title="Pre Session", height_control=HEIGHT_CONTROL, alpha=P_VALUE)
-pre_report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f"{SUB}_pre_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE}_glm_report.html"))
+pre_report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f'{SUB}_pre_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}glm_report.html'))
 
 post_report = make_glm_report(post_glm, CONTRAST_TYPE.get_vector(post_glm.design_matrices_[0]), title="Post Session", height_control=HEIGHT_CONTROL, alpha=P_VALUE)
-post_report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f"{SUB}_post_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE}_glm_report.html"))
+post_report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f'{SUB}_post_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}glm_report.html'))
 
 # SECOND LEVEL
-pre_vs_post_report = make_glm_report(second_level_model, 'session', height_control=HEIGHT_CONTROL, alpha=P_VALUE)
-pre_vs_post_report.save_as_html(os.path.join(SUBJECT_REPORT_FOLDER, f"{SUB}_second_level_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE}_glm_report.html"))
-print(f"Saved second-level pre vs post GLM report to {SUBJECT_REPORT_FOLDER}")
+# No report simply contrasts computed
+
+## Clean up data to save space
+remove_subject_data(SUB)

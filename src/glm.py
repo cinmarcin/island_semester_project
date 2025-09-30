@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 from enum import Enum
 from contrast_types import ContrastType
 from nilearn import datasets, image
+from nilearn.image import resample_to_img
+from utils.debug import check_second_level_mask, check_images
+
 
 
 BLUE = "\033[34m"
@@ -39,6 +42,41 @@ def create_gm_mask(func_img):
     gm_mask_resampled = image.resample_to_img(gm_mask, func_img, interpolation='nearest', force_resample=True, copy_header=True)
     gm_mask_img = nib.Nifti1Image((gm_mask_resampled.get_fdata() > 0).astype(int), gm_mask_resampled.affine, gm_mask_resampled.header)
     return gm_mask_img
+
+def create_hippocampal_gm_mask(func_img):
+    """
+    Create a hippocampal gray matter mask resampled to the functional image.
+    Args:
+        func_img (nibabel.Nifti1Image): Functional image in MNI space.
+    Returns:
+        hippocampal_gm_mask_img (nibabel.Nifti1Image): Resampled hippocampal GM mask image.
+    """
+    print("Creating hippocampal gray matter mask...")
+    # Load Harvard-Oxford cortical atlas
+    atlas = datasets.fetch_atlas_harvard_oxford('cort-maxprob-thr0-1mm')
+    atlas_img = atlas['maps']
+    atlas_data = atlas_img.get_fdata()
+
+    # Select left and right hippocampus (indices 17 and 53)
+    hippocampus_mask_data = np.isin(atlas_data, [17, 53])
+    hippocampus_mask_img = nib.Nifti1Image(hippocampus_mask_data.astype(np.uint8), atlas_img.affine)
+
+    # Load MNI gray matter mask
+    gm_mask_img = datasets.load_mni152_gm_mask(resolution=2.5, threshold=0.2, n_iter=2)
+
+    # Resample hippocampal mask to GM mask space
+    hippocampus_resampled = image.resample_to_img(hippocampus_mask_img, gm_mask_img, interpolation='nearest', force_resample=True, copy_header=True)
+
+    # Intersect with GM mask (binary AND)
+    intersection_data = (hippocampus_resampled.get_fdata() > 0) & (gm_mask_img.get_fdata() > 0)
+    hippocampal_gm_mask_img = nib.Nifti1Image(intersection_data.astype(np.uint8), gm_mask_img.affine, gm_mask_img.header)
+
+    # Resample to functional image space
+    hippocampal_gm_mask_resampled = image.resample_to_img(hippocampal_gm_mask_img, func_img, interpolation='nearest', force_resample=True, copy_header=True)
+    hippocampal_gm_mask_resampled = nib.Nifti1Image((hippocampal_gm_mask_resampled.get_fdata() > 0).astype(np.uint8), hippocampal_gm_mask_resampled.affine, 
+                                                    hippocampal_gm_mask_resampled.header)
+
+    return hippocampal_gm_mask_resampled
 
 def events_to_stimuli(events):
     """
@@ -96,7 +134,7 @@ def save_design_matrix(design_matrix, filepath):
     print(f"Saved design matrix to {filepath} and plot to {plot_path}")
 
 
-def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, confounds_list, contrast_type: ContrastType, smoothing_fwhm=None):
+def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, confounds_list, contrast_type: ContrastType, smoothing_fwhm=None, hippocampus_only=False):
     """
     Perform first-level GLM analysis on concatenated fMRI data.
     Args:
@@ -143,7 +181,10 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
 
     # Create mask
-    gm_mask_img = create_gm_mask(fmri_data)
+    if hippocampus_only:
+        gm_mask_img = create_hippocampal_gm_mask(fmri_data)
+    else:
+        gm_mask_img = create_gm_mask(fmri_data)
 
     # Fit GLM
     fmri_glm = FirstLevelModel(mask_img=gm_mask_img, smoothing_fwhm=smoothing_fwhm, n_jobs=-1)
@@ -169,7 +210,7 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
 
     return fmri_glm, contrast, csf_contrast, wm_contrast
 
-def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, title=None):
+def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, hippocampus_only=False):
     """
     Perform first-level GLM analysis on single fMRI data.
     Args:
@@ -194,7 +235,10 @@ def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: 
     design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
 
     # Create mask
-    gm_mask_img = create_gm_mask(fmri_data)
+    if hippocampus_only:
+        gm_mask_img = create_hippocampal_gm_mask(fmri_data)
+    else:
+        gm_mask_img = create_gm_mask(fmri_data)
 
     # Fit GLM
     fmri_glm = FirstLevelModel(mask_img=gm_mask_img, smoothing_fwhm=smoothing_fwhm, n_jobs=-1)
@@ -241,24 +285,15 @@ def group_level_analysis(contrast_maps, height_control, alpha, save_path):
     print(f"Saved second-level GLM report to {save_path}")
     return second_level_model, second_level_contrast
 
-def pre_vs_post_second_level_analysis(pre_contrasts, post_contrasts):
+def compute_pre_post_contrast(pre_contrast, post_contrast):
     """
-    Perform second-level GLM analysis comparing pre and post contrasts.
+    Compute the difference between post and pre contrast images.
     Args:
-        pre_contrasts (list of nibabel.Nifti1Image): List of pre-session contrast images from first-level.
-        post_contrasts (list of nibabel.Nifti1Image): List of post-session contrast images from first-level.
+        pre_contrast (nibabel.Nifti1Image): Pre contrast image.
+        post_contrast (nibabel.Nifti1Image): Post contrast image.
     Returns:
-        second_level_model (SecondLevelModel): Fitted SecondLevelModel object.
-        second_level_contrast (nibabel.Nifti1Image): Contrast image for the second-level analysis.
+        diff_contrast (nibabel.Nifti1Image): Difference image (post - pre).
     """
-    pre_contrasts = [pre_contrasts]
-    post_contrasts = [post_contrasts]
-    all_contrasts = pre_contrasts + post_contrasts
-
-    design_matrix = pd.DataFrame({
-        "intercept": [1] * len(all_contrasts),
-        "session": [0] * len(pre_contrasts) + [1] * len(post_contrasts)
-    })
-    second_level_model = SecondLevelModel().fit(all_contrasts, design_matrix=design_matrix)
-    second_level_contrast = second_level_model.compute_contrast(second_level_contrast='session', output_type='z_score')    
-    return second_level_model, second_level_contrast
+    post_resampled = image.resample_to_img(post_contrast, pre_contrast, interpolation='nearest', force_resample=True, copy_header=True)
+    diff_contrast = image.math_img("post - pre", post=post_resampled, pre=pre_contrast)
+    return diff_contrast

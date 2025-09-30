@@ -13,6 +13,7 @@ CONTRAST_TYPE = ContrastType.ORDER
 SMOOTHING_FWHM = None # in mm
 HEIGHT_CONTROL = "bonferroni"  # "fdr" or "bonferroni"
 P_VALUE = 0.05
+HIPPOCAMPUS_ONLY = True  # If True, restrict analysis to hippocampus only
 
 ## Paths
 list_of_subs = [
@@ -63,8 +64,8 @@ for sub in tqdm(list_of_subs):
     print(f"--- Processing subject: {sub}")
     SUBJECT_FOLDER_IN = os.path.join(DATA_INPUT_PATH, sub)
     SUBJECT_FOLDER = os.path.join(DATA_OUTPUT_PATH, sub)
-    PRE_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_pre_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
-    POST_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_post_smooth_{SMOOTHING_FWHM}_{HEIGHT_CONTROL}_{CONTRAST_TYPE.value}_fitted_glm.pkl')
+    PRE_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
+    POST_GLM_MODEL_PATH = os.path.join(SUBJECT_FOLDER_IN, f'{sub}_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
     if not os.path.exists(SUBJECT_FOLDER):
         os.makedirs(SUBJECT_FOLDER)
 
@@ -80,8 +81,8 @@ for sub in tqdm(list_of_subs):
     pre_correlation_matrix = np.corrcoef(pre_trial_data)
     post_correlation_matrix = np.corrcoef(post_trial_data)
     # Save correlation matrix
-    pre_correlation_matrix_path = os.path.join(SUBJECT_FOLDER, f'{sub}_pre_correlation_matrix.npy')
-    post_correlation_matrix_path = os.path.join(SUBJECT_FOLDER, f'{sub}_post_correlation_matrix.npy')
+    pre_correlation_matrix_path = os.path.join(SUBJECT_FOLDER, f'{sub}_pre_{"hippo_" if HIPPOCAMPUS_ONLY else ""}correlation_matrix.npy')
+    post_correlation_matrix_path = os.path.join(SUBJECT_FOLDER, f'{sub}_post_{"hippo_" if HIPPOCAMPUS_ONLY else ""}correlation_matrix.npy')
     dump(pre_correlation_matrix, pre_correlation_matrix_path)
     dump(post_correlation_matrix, post_correlation_matrix_path)
     # Save correlation matrix figure
@@ -92,8 +93,7 @@ for sub in tqdm(list_of_subs):
     plt.title(f'Correlation Matrix for {sub}')
     plt.xlabel('Trials')
     plt.ylabel('Trials')
-    figure_path = os.path.join(SUBJECT_FOLDER, f'{sub}_pre_correlation_matrix.png')
-    plt.savefig(figure_path)
+    plt.savefig(pre_correlation_matrix_path.replace('.npy', '.png'))
     plt.close()
     # POST
     plt.figure(figsize=(10, 8))
@@ -102,8 +102,7 @@ for sub in tqdm(list_of_subs):
     plt.title(f'Correlation Matrix for {sub}')
     plt.xlabel('Trials')
     plt.ylabel('Trials')
-    figure_path = os.path.join(SUBJECT_FOLDER, f'{sub}_post_correlation_matrix.png')
-    plt.savefig(figure_path)
+    plt.savefig(post_correlation_matrix_path.replace('.npy', '.png'))
     plt.close()
 
     print(f"Saved correlation matrices to {pre_correlation_matrix_path} and {post_correlation_matrix_path}")
@@ -169,7 +168,7 @@ dashed_line = mpatches.Patch(color='black', label='Post-Viewing', linestyle='--'
 plt.legend(handles=[solid_line, dashed_line], loc='upper left')
 
 
-plt.savefig(os.path.join(FIGURE_OUTPUT_PATH, "group_level_correlation_within_vs_across.png"))
+plt.savefig(os.path.join(FIGURE_OUTPUT_PATH, f"group_level_correlation_within_vs_across{'_hippo' if HIPPOCAMPUS_ONLY else ''}.png"))
 plt.show()
 
 # T test between within and across
