@@ -105,7 +105,10 @@ def create_design_matrix(n_scans, events, metadata, confounds):
     frame_times = (
         np.arange(n_scans) * tr
     )
-    add_regressors = confounds[["trans_x","trans_y","trans_z","rot_x","rot_y","rot_z","global_signal","csf","white_matter"]]
+    add_regressors = confounds[["trans_x","trans_y","trans_z","rot_x","rot_y","rot_z","global_signal","csf","white_matter"]].copy()
+
+    if "session_post" in confounds.columns:
+        add_regressors["session_post"] = confounds["session_post"]
 
     design_matrix = make_first_level_design_matrix(
         frame_times,
@@ -177,6 +180,12 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     # Concatenate confounds
     confounds = pd.concat(confounds_list, ignore_index=True)
 
+    # Add session regressor
+    session_regressors = pd.DataFrame({
+    'session_post': [0] * n_volumes_pre + [1] * (n_scans - n_volumes_pre),
+    })
+    confounds = pd.concat([confounds.reset_index(drop=True), session_regressors], axis=1)
+
     # Create design matrix
     design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
 
@@ -198,17 +207,7 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
         contrast_vec = list(contrast_vec.values())[-1]
     contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
 
-    # CSF Contrast
-    csf_contrast_vec = np.array([1 if 'csf' in c else 0 for c in design_matrix.columns])
-    csf_contrast = fmri_glm.compute_contrast(csf_contrast_vec, output_type='z_score')
-    print("Computed CSF contrast.")
-
-    # White Matter Contrast
-    wm_contrast_vec = np.array([1 if 'white_matter' in c else 0 for c in design_matrix.columns])
-    wm_contrast = fmri_glm.compute_contrast(wm_contrast_vec, output_type='z_score')
-    print("Computed White Matter contrast.")
-
-    return fmri_glm, contrast, csf_contrast, wm_contrast
+    return fmri_glm, contrast
 
 def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, hippocampus_only=False):
     """
@@ -251,17 +250,7 @@ def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: 
     contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
     print(f"Computed contrast for {contrast_type}.")
 
-    # CSF Contrast
-    csf_contrast_vec = np.array([1 if 'csf' in c else 0 for c in design_matrix.columns])
-    csf_contrast = fmri_glm.compute_contrast(csf_contrast_vec, output_type='z_score')
-    print("Computed CSF contrast.")
-
-    # White Matter Contrast
-    wm_contrast_vec = np.array([1 if 'white_matter' in c else 0 for c in design_matrix.columns])
-    wm_contrast = fmri_glm.compute_contrast(wm_contrast_vec, output_type='z_score')
-    print("Computed White Matter contrast.")
-
-    return fmri_glm, contrast, csf_contrast, wm_contrast
+    return fmri_glm, contrast
 
 def group_level_analysis(contrast_maps, height_control, alpha, save_path):
     """

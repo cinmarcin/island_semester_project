@@ -45,7 +45,7 @@ POST_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_post_smooth_{SMOOTHING_FW
 SECOND_LEVEL_MODEL_PATH = os.path.join(SUBJECT_FOLDER, f'{SUB}_second_level_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}fitted_glm.pkl')
 if not os.path.exists(SUBJECT_FOLDER):
     os.makedirs(SUBJECT_FOLDER)
-LOAD_MODELS = os.path.exists(MODEL_PATH) and os.path.exists(PRE_MODEL_PATH) and os.path.exists(POST_MODEL_PATH) and os.path.exists(SECOND_LEVEL_MODEL_PATH)
+LOAD_MODELS = os.path.exists(MODEL_PATH) and os.path.exists(PRE_MODEL_PATH) and os.path.exists(POST_MODEL_PATH)
 
 ## Data Loading
 if LOAD_MODELS:
@@ -53,44 +53,42 @@ if LOAD_MODELS:
     fmri_glm = load(MODEL_PATH)
     pre_glm = load(PRE_MODEL_PATH)
     post_glm = load(POST_MODEL_PATH)
-    second_level_model = load(SECOND_LEVEL_MODEL_PATH)
 else:
     # Load raw data
     pre_fmri_data, pre_confounds_df, pre_events_df, pre_metadata = load_subject_data(SUB, pre_ses)
     post_fmri_data, post_confounds_df, post_events_df, post_metadata = load_subject_data(SUB, post_ses)
-    
+
     # Concatenate pre and post 
     fmri_concat = [pre_fmri_data, post_fmri_data]
-    confounds_concat =[pre_confounds_df, post_confounds_df]
-    events_concat = [pre_events_df, post_events_df]
+    confounds_concat = [pre_confounds_df, post_confounds_df]
+    events_concat = [pre_events_df.copy(), post_events_df.copy()]
     metadata_concat = [pre_metadata, post_metadata]
-    
-    ## COMBINED Analysis
-    fmri_glm, contrast, csf_contrast, wm_contrast = combined_first_level_analysis(fmri_concat, events_concat, metadata_concat, confounds_concat, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
-    dump(fmri_glm, MODEL_PATH)
-    contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    # csf_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    # wm_contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
-    print(f"Saved combined model to {MODEL_PATH}")
 
     ## SEPARATE Analysis
-    pre_glm, pre_contrast, pre_csf_contrast, pre_wm_contrast = first_level_analysis(pre_fmri_data, pre_events_df, pre_metadata, pre_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
-    post_glm, post_contrast, post_csf_contrast, post_wm_contrast = first_level_analysis(post_fmri_data, post_events_df, post_metadata, post_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
+    pre_glm, pre_contrast = first_level_analysis(pre_fmri_data, pre_events_df, pre_metadata, pre_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
+    post_glm, post_contrast = first_level_analysis(post_fmri_data, post_events_df, post_metadata, post_confounds_df, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
 
     dump(pre_glm, PRE_MODEL_PATH)
     pre_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    # pre_csf_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    # pre_wm_contrast.to_filename(PRE_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
     dump(post_glm, POST_MODEL_PATH)
     post_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
-    # post_csf_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'csf_contrast.nii.gz'))
-    # post_wm_contrast.to_filename(POST_MODEL_PATH.replace('fitted_glm.pkl', 'wm_contrast.nii.gz'))
     print(f"Saved separate models to {PRE_MODEL_PATH} and {POST_MODEL_PATH}")
+    
+
+    
+    ## COMBINED Analysis
+    fmri_glm, contrast = combined_first_level_analysis(fmri_concat, events_concat, metadata_concat, confounds_concat, CONTRAST_TYPE, SMOOTHING_FWHM, HIPPOCAMPUS_ONLY)
+    dump(fmri_glm, MODEL_PATH)
+    contrast.to_filename(MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
+    print(f"Saved combined model to {MODEL_PATH}")
+
+
 
     ## SECOND LEVEL - PRE vs POST
     pre_vs_post_contrast = compute_pre_post_contrast(pre_contrast, post_contrast)
     pre_vs_post_contrast.to_filename(SECOND_LEVEL_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz'))
     print(f"Saved pre vs post contrast to {SECOND_LEVEL_MODEL_PATH.replace('fitted_glm.pkl', 'contrast.nii.gz')}")
+
 
 
 ## Produce Reports

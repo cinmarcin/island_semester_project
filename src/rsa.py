@@ -31,10 +31,13 @@ def create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=Fa
     for i in range(total_trials):
         for j in range(total_trials):
             rdm[i, j] = min(abs((i % (n_trials)) - (j % (n_trials))), abs((i % (n_trials) + dist) - (j % (n_trials))), abs((i % (n_trials) - dist) - (j % (n_trials))))
+
+    # Inverse the RDM to represent dissimilarity
+    rdm = rdm.max() - rdm
     # plot
     if save_fig is not None:
         plt.imshow(rdm, cmap='viridis')
-        plt.colorbar(label='Dissimilarity')
+        plt.colorbar(label='Correlation')
         plt.title(f'Index RDM for {n_trials} trials with {repetitions} repetitions each')
         plt.xlabel('Trial Index')
         plt.ylabel('Trial Index')

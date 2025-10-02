@@ -6,7 +6,7 @@ from nilearn import image
 
 
 ## Controls
-CONTRAST_TYPE = ContrastType.OLD_VS_NEW
+CONTRAST_TYPE = ContrastType.FACES_VS_OBJECTS
 SMOOTHING_FWHM = 5 # in mm
 HEIGHT_CONTROL = "fdr"  # "fdr" or "bonferroni"
 HIPPOCAMPUS_ONLY = False
@@ -30,30 +30,30 @@ list_of_subs = [
                 'sub-P16',
                 'sub-P17',
                 'sub-P18',
-        #         'sub-P19',
-        #         'sub-P20',
-        #         'sub-P21',
-        #         'sub-P22',
-        #         'sub-P23',
-        #         'sub-P25',
-        # #        'sub-P26', missing event file
-        #         'sub-P27',
-        #         'sub-P30',
-        #         'sub-P31',
-        #         'sub-P34',
-        #         'sub-P35',
-        #         'sub-P36',
-        #         'sub-P37',
-        #         'sub-P41',
-        #         'sub-P42',
-        #         'sub-P43',
-        #         'sub-P44',
-        #         'sub-P45',
-        #         'sub-P47',
-        #         'sub-P48',
-        #         'sub-P49',
-        #         'sub-P50',
-        #         'sub-P51',
+                'sub-P19',
+            #    'sub-P20', Unattentive
+                'sub-P21',
+                'sub-P22',
+                'sub-P23',
+                'sub-P25',
+        #        'sub-P26', missing event file
+                'sub-P27',
+        #        'sub-P30', incomplete data
+                'sub-P31',
+                'sub-P34',
+                'sub-P35',
+                'sub-P36',
+                'sub-P37',
+                'sub-P41',
+                'sub-P42',
+                'sub-P43',
+                'sub-P44',
+                'sub-P45',
+                'sub-P47',
+                'sub-P48',
+        #        'sub-P49',   Unattentive
+                'sub-P50',
+                'sub-P51',
                 ]
 for CONTRAST_PATH_ENDING in CONTRAST_PATH_ENDINGS:
     print(f"Processing group-level GLM for: {CONTRAST_PATH_ENDING}")

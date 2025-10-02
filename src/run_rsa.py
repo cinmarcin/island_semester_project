@@ -6,6 +6,8 @@ from rsa import create_index_rdm, correlation_accross_repetitions, correlation_w
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as mpatches
+import pandas as pd
+import seaborn as sns
 
 
 ## Controls
@@ -25,30 +27,30 @@ list_of_subs = [
                 'sub-P16',
                 'sub-P17',
                 'sub-P18',
-        #         'sub-P19',
-        #         'sub-P20',
-        #         'sub-P21',
-        #         'sub-P22',
-        #         'sub-P23',
-        #         'sub-P25',
-        # #        'sub-P26', missing event file
-        #         'sub-P27',
-        #         'sub-P30',
-        #         'sub-P31',
-        #         'sub-P34',
-        #         'sub-P35',
-        #         'sub-P36',
-        #         'sub-P37',
-        #         'sub-P41',
-        #         'sub-P42',
-        #         'sub-P43',
-        #         'sub-P44',
-        #         'sub-P45',
-        #         'sub-P47',
-        #         'sub-P48',
-        #         'sub-P49',
-        #         'sub-P50',
-        #         'sub-P51',
+                'sub-P19',
+            #    'sub-P20', Unattentive
+                'sub-P21',
+                'sub-P22',
+                'sub-P23',
+                'sub-P25',
+        #        'sub-P26', missing event file
+                'sub-P27',
+        #        'sub-P30', incomplete data
+                'sub-P31',
+                'sub-P34',
+                'sub-P35',
+                'sub-P36',
+                'sub-P37',
+                'sub-P41',
+                'sub-P42',
+                'sub-P43',
+                'sub-P44',
+                'sub-P45',
+                'sub-P47',
+                'sub-P48',
+        #        'sub-P49',   Unattentive
+                'sub-P50',
+                'sub-P51',
                 ]
 
 DATA_INPUT_PATH = f'data/processed/glm/{CONTRAST_TYPE.value}'
@@ -60,6 +62,8 @@ if not os.path.exists(FIGURE_OUTPUT_PATH):
 group_level_correlation_within_repetitions = []
 group_level_correlation_accross_repetitions = []
 group_level_correlation_matrices = []
+pre_avgs = []
+post_avgs = []
 for sub in tqdm(list_of_subs):
     print(f"--- Processing subject: {sub}")
     SUBJECT_FOLDER_IN = os.path.join(DATA_INPUT_PATH, sub)
@@ -75,6 +79,24 @@ for sub in tqdm(list_of_subs):
 
     pre_trial_data = extract_beta_maps(pre_fmri_glm)
     post_trial_data = extract_beta_maps(post_fmri_glm)
+
+    # Reshape to (repetitions, tasks, n_voxels)
+    pre_reshaped = pre_trial_data.reshape(6, 64, -1)
+    post_reshaped = post_trial_data.reshape(6, 64, -1)
+
+    # Average within repetitions
+    pre_avg_rep = pre_reshaped.mean(axis=1)  
+    post_avg_rep = post_reshaped.mean(axis=1) 
+
+    # Average over voxels
+    pre_avg = pre_avg_rep.mean(axis=1)
+    post_avg = post_avg_rep.mean(axis=1)
+
+    pre_avgs.append(pre_avg)
+    post_avgs.append(post_avg)
+
+
+
 
     # Compute correlation matrix
     print("Computing correlation matrix...")
@@ -175,3 +197,35 @@ plt.show()
 from scipy.stats import ttest_rel
 t_stat, p_value = ttest_rel(group_level_correlation_within_repetitions, group_level_correlation_accross_repetitions, alternative='greater')
 print(f"T-test between within and across repetitions: t={t_stat}, p={p_value}")
+
+# Plot boxplots 
+pre_avgs = np.array(pre_avgs)
+# Assume pre_avgs is already a NumPy array of shape (N_participants, 6)
+N, n_reps = pre_avgs.shape
+
+# Convert to long format for Seaborn
+df = pd.DataFrame(pre_avgs, columns=[f"Rep {r+1}" for r in range(n_reps)])
+df_long = df.melt(var_name="Repetition", value_name="Beta")
+
+# Map repetitions to numeric x-values for fitting
+rep_mapping = {f"Rep {r+1}": r+1 for r in range(n_reps)}
+df_long["Rep_num"] = df_long["Repetition"].map(rep_mapping)
+
+plt.figure(figsize=(8, 6))
+
+# Boxplot
+sns.boxplot(x="Repetition", y="Beta", data=df_long, color="lightblue", fliersize=2)
+
+# Overlay estimated linear fit (mean trend)
+sns.regplot(x="Rep_num", y="Beta", data=df_long, scatter=True, color="blue", label="Estimated fit", ci=None)
+
+plt.xlabel("Repetition")
+plt.ylabel("Beta value")
+plt.title("Pre — Beta values per repetition")
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.legend()
+plt.tight_layout()
+
+# Save figure
+plt.savefig(os.path.join(FIGURE_OUTPUT_PATH, f"pre_beta_values_per_repetition{'_hippo' if HIPPOCAMPUS_ONLY else ''}.png"))
+plt.show()
