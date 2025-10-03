@@ -208,7 +208,7 @@ df = pd.DataFrame(pre_avgs, columns=[f"Rep {r+1}" for r in range(n_reps)])
 df_long = df.melt(var_name="Repetition", value_name="Beta")
 
 # Map repetitions to numeric x-values for fitting
-rep_mapping = {f"Rep {r+1}": r+1 for r in range(n_reps)}
+rep_mapping = {f"Rep {r+1}": r for r in range(n_reps)}
 df_long["Rep_num"] = df_long["Repetition"].map(rep_mapping)
 
 plt.figure(figsize=(8, 6))

@@ -6,11 +6,11 @@ from nilearn import image
 
 
 ## Controls
-CONTRAST_TYPE = ContrastType.FACES_VS_OBJECTS
-SMOOTHING_FWHM = 5 # in mm
-HEIGHT_CONTROL = "fdr"  # "fdr" or "bonferroni"
-HIPPOCAMPUS_ONLY = False
-P_VALUE = 0.05
+CONTRAST_TYPE = ContrastType.OLD_VS_NEW
+SMOOTHING_FWHM = None # in mm
+HEIGHT_CONTROL = "fpr"  # "fdr" or "bonferroni"
+HIPPOCAMPUS_ONLY = True
+P_VALUE = 0.001
 
 CONTRAST_PATH_ENDINGS= [f'_post_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz',
                         f'_pre_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}contrast.nii.gz',
