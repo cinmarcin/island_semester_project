@@ -2,6 +2,7 @@ from operator import sub
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
 
 def create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=False):
     """
@@ -95,3 +96,48 @@ def extract_beta_maps(fmri_glm):
     n_trials = beta_maps.shape[-1]
     trial_data = beta_maps.reshape((n_voxels, n_trials)).T  #
     return trial_data
+
+def get_model_rdm(sub: str, path_to_raw_data, spatial=True, min_confidence=0):
+    """
+    Compute model matrices for a given subject on its judgment distances.
+    Parameters
+    ----------
+    sub : str
+        Subject identifier.
+    path_to_raw_data : str
+        Path to the raw data directory.
+    spatial : bool
+        Whether to compute spatial or temporal RDMs.
+    min_confidence : float
+        Minimum confidence level for including trials. (on a scale 0-100)
+    Returns
+    -------
+    np.ndarray
+        The computed RDM matrix.
+    selected_trials : np.ndarray
+        The trials that were included in the RDM computation.
+    """
+    from scipy.spatial.distance import pdist, squareform
+    df = pd.read_csv(path_to_raw_data)
+    df = df[df['Participant'] == sub]
+
+    if spatial:
+        df = df[df['Placed Confidence'] >= min_confidence]
+        selected_trials = df['V4'].unique()
+        df = df[['X', 'Y', 'Z', 'Placed Confidence']]
+        judged_positions = df[['X', 'Y', 'Z']].to_numpy()
+
+    else:
+        df = df[df['Timed (days)'] != 100]
+        df = df[df['Timed Confidence'] >= min_confidence]
+
+        if len(df) < 2:
+            raise ValueError(f'Participant {sub} has less than 2 valid temporal judgments & should probably be discarded.')
+        
+        selected_trials = df['V4'].unique()
+        df = df[['Timed (days)', 'Timed Confidence']]
+        judged_positions = df[['Timed (days)']].to_numpy()
+
+    dist_matrix = squareform(pdist(judged_positions))
+
+    return dist_matrix, selected_trials

@@ -126,3 +126,22 @@ def remove_subject_data(sub):
         print(f"Removed local data for {sub}.")
     else:
         print(f"No local data found for {sub} at {local_base_path}.")
+
+def download_event_file(sub, session):
+    """
+    Download event file using ssh for a given subject and session.
+    Args:
+        sub (str): Subject identifier (e.g., 'sub-P10').
+        session (str): Session identifier (e.g., 'ses-01').
+    """
+    remote_base_path = f"boesch@miplabsrv3:/media/RCPNAS/Data3/Alison_island/bids_ackbar/"
+    remote_events_file = os.path.join(remote_base_path, f"{sub}/{session}/func/{sub}_{session}_task-memory_events.tsv")
+
+    local_base_path = os.path.join('data/raw', sub, 'func')
+    os.makedirs(local_base_path, exist_ok=True)
+
+    scp_command = f"scp {remote_events_file} {local_base_path}/"
+    print(f"Executing command: {scp_command}")
+    os.system(scp_command)
+    print(f"Downloaded event file for {sub}, {session} to {local_base_path}.")
+    return os.path.join(local_base_path, f"{sub}_{session}_task-memory_events.tsv")

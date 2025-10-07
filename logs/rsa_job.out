@@ -4311,3 +4311,4 @@ Average correlation for trial 63 across repetitions: -0.0056
 Average correlation for trial 64 across repetitions: -0.0047
 Overall average correlation across all repetitions: 0.0048
 T-test between within and across repetitions: t=26.490043990916202, p=2.7149536495130572e-33
+ANOVA across repetitions (Pre): F=0.4160536999565652, p=0.837111225973037

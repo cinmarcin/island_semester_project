@@ -13,6 +13,7 @@ from contrast_types import ContrastType
 from nilearn import datasets, image
 from nilearn.image import resample_to_img
 from utils.debug import check_second_level_mask, check_images
+from utils.data import download_event_file
 
 
 
@@ -286,3 +287,19 @@ def compute_pre_post_contrast(pre_contrast, post_contrast):
     post_resampled = image.resample_to_img(post_contrast, pre_contrast, interpolation='nearest', force_resample=True, copy_header=True)
     diff_contrast = image.math_img("post - pre", post=post_resampled, pre=pre_contrast)
     return diff_contrast
+
+def get_old_trials_idx(sub: str, session: str):
+    """
+    Get indices of old trials from the events file.
+    Args:
+        sub (str): Subject identifier.
+        session (str): Session identifier ('ses-01' or 'ses-05').
+    Returns:
+        old_trials_idx (list of int): List of indices corresponding to old trials.
+    """
+    path = download_event_file(sub, session)
+    events = pd.read_csv(path, sep='\t')
+    old_trials = events[events['trial_type'] == 'old']
+    old_trials_idx = old_trials.index.tolist()
+    print(f"Found {len(old_trials_idx)} old trials for {sub} in {session}.")
+    return old_trials_idx

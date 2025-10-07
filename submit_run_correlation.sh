@@ -17,4 +17,4 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate miplab_env
 
 # Run your Python script
-python src/run_rsa.py 
+python src/run_correlation.py 
