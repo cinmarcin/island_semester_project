@@ -1,15 +1,17 @@
 
 from contrast_types import ContrastType
 import os
-from rsa import extract_beta_maps
+from rsa import extract_beta_maps, compute_rsa
 from tqdm import tqdm
 from joblib import load
 from glm import get_old_trials_idx
+import numpy as np
 
 ## Controls
 CONTRAST_TYPE = ContrastType.ORDER
 SMOOTHING_FWHM = None # in mm
 HIPPOCAMPUS_ONLY = True  # If True, restrict analysis to hippocampus only
+NB_REPETITIONS = 6  # Number of repetitions during picture-viewing task
 
 list_of_subs = [
                 'sub-P10',
@@ -63,14 +65,19 @@ for sub in tqdm(list_of_subs):
     fmri_glm = load(MODEL_PATH)
     print(f"Loaded GLM model from {MODEL_PATH}")
 
-    # Print columns of the design matrix
-    print("Design matrix columns:")
-    print(fmri_glm.design_matrices_[0].columns)
-
     # Get only old indexs only pre is necessary as they are the same for pre and post
     old_trials_idx = get_old_trials_idx(sub)
-
+    
+    # sub-sample for test purposes
+    old_trials_idx = old_trials_idx[::48]  # using only the 6 repetitions of the first trial
+    print(f"Using {old_trials_idx} ")
     # Extract beta maps for old trials only
     pre_beta_maps = extract_beta_maps(fmri_glm, idxs=old_trials_idx, run_label='pre')
-    post_beta_maps = extract_beta_maps(fmri_glm, idxs=old_trials_idx, run_label='post')
-    print(f"Extracted {pre_beta_maps.shape[0]} pre and {post_beta_maps.shape[0]} post beta maps for old trials.")
+    # post_beta_maps = extract_beta_maps(fmri_glm, idxs=old_trials_idx, run_label='post')
+
+    # Create 2D version of beta maps indexes (n_rep, n_trials)
+    beta_maps_idxs = np.arange(len(old_trials_idx)).reshape((NB_REPETITIONS, -1))
+
+    # Correlate every beta maps with every other beta maps of every other repetition
+    pre_rsa = compute_rsa(pre_beta_maps, beta_maps_idxs)
+    print(f"Pre RSA shape: {pre_rsa.shape}")

@@ -170,3 +170,23 @@ def get_model_rdm(sub: str, path_to_raw_data, spatial=True, min_confidence=0):
     dist_matrix = squareform(pdist(judged_positions))
 
     return dist_matrix, selected_trials
+
+def compute_rsa(beta_maps, beta_maps_idxs):
+    """
+    Compute Representational Similarity Analysis (RSA) by spearman correlating beta maps. 
+    Only correlate the beta map of a trial with every other trial in every other repetition.
+    Parameters
+    ----------
+    beta_maps : np.ndarray
+        Array of shape (n_repetitions * n_trials, n_voxels) containing the beta maps.
+    beta_maps_idxs : np.ndarray
+        2D array of shape (n_repetitions, n_trials) containing the indices of beta maps.
+    Returns 
+    -------
+    np.ndarray
+        The computed correlation matrix in the shape (n_trials, n_trials).
+    """
+    from scipy.stats import spearmanr
+    n_trials = beta_maps_idxs.shape[1]
+    correlation_matrix = spearmanr(beta_maps, axis=1).correlation
+    return correlation_matrix
