@@ -2,5 +2,5 @@
 
 contrast_type: old_vs_new       # options: old_vs_new, pre_vs_post, etc.
 smoothing_fwhm: 5            # in mm, null means no smoothing
-height_control: bonferroni      # or fdr
+height_control: fdr      # or fdr
 p_value: 0.05                   # significance threshold

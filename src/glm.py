@@ -79,6 +79,26 @@ def create_hippocampal_gm_mask(func_img):
 
     return hippocampal_gm_mask_resampled
 
+
+def create_group_mask(subject_masks, threshold=0.8):
+    """
+    Combine subject masks into a group mask.
+    
+    Args:
+        subject_masks (list of Nifti1Image): list of individual masks in same space
+        threshold (float): fraction of subjects that must have voxel present (0-1)
+        
+    Returns:
+        Nifti1Image: group mask
+    """
+    data_stack = np.stack([mask.get_fdata() > 0 for mask in subject_masks], axis=-1)
+    coverage = data_stack.mean(axis=-1)
+    group_data = (coverage >= threshold).astype(np.uint8)
+    
+    # Use affine/header from first mask
+    group_mask_img = nib.Nifti1Image(group_data, subject_masks[0].affine, subject_masks[0].header)
+    return group_mask_img
+
 def events_to_stimuli(events):
     """
     Convert events DataFrame to stimuli format.
@@ -91,7 +111,7 @@ def events_to_stimuli(events):
     events.columns = ['onset', 'duration', 'trial_type']
     return events
 
-def create_design_matrix(n_scans, events, metadata, confounds):
+def create_design_matrix(n_scans, events, metadata, confounds, drift_model="cosine", high_pass=0.01):
     """
     Create a design matrix for fMRI analysis.
     Args:
@@ -99,6 +119,8 @@ def create_design_matrix(n_scans, events, metadata, confounds):
         events (pandas.DataFrame): DataFrame containing event information with at least three columns: onset, duration, and trial_type.
         metadata (dict): Metadata dictionary containing at least the "RepetitionTime" key.
         confounds (pandas.DataFrame): DataFrame containing confound time series.
+        drift_model (str): Drift model to use (default is "cosine").
+        high_pass (float): High-pass filter cutoff frequency (default is 0.01).
     Returns:
         design_matrix (pandas.DataFrame): Design matrix for fMRI analysis.
     """
@@ -106,19 +128,19 @@ def create_design_matrix(n_scans, events, metadata, confounds):
     frame_times = (
         np.arange(n_scans) * tr
     )
-    add_regressors = confounds[["trans_x","trans_y","trans_z","rot_x","rot_y","rot_z","global_signal","csf","white_matter"]].copy()
-
-    if "session_post" in confounds.columns:
-        add_regressors["session_post"] = confounds["session_post"]
+    if "trans_x" in confounds.columns:
+        add_regressors = confounds[["trans_x","trans_y","trans_z","rot_x","rot_y","rot_z","global_signal","csf","white_matter"]].copy()
+    else:
+        add_regressors = confounds.copy()
 
     design_matrix = make_first_level_design_matrix(
         frame_times,
         events,
-        hrf_model='spm',
-        drift_model="cosine",
-        high_pass=0.01,
+        hrf_model='spm + derivative + dispersion',
+        drift_model=drift_model,
+        high_pass=high_pass,
         add_regs=add_regressors,
-        add_reg_names=add_regressors.columns.tolist()
+        add_reg_names=add_regressors.columns.tolist(),
     )
     print(f"Created design matrix with shape: {design_matrix.shape}")  
     return design_matrix
@@ -150,7 +172,10 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
         smoothing_fwhm (float): Smoothing FWHM in mm.
     Returns:
         fmri_glm (FirstLevelModel): Fitted FirstLevelModel object.
-        contrast (nibabel.Nifti1Image): Contrast image for the specified contrast type.
+        pre_contrast (nibabel.Nifti1Image): Contrast image for the pre session.
+        post_contrast (nibabel.Nifti1Image): Contrast image for the post session.
+        pre_post_contrast (nibabel.Nifti1Image): Contrast image for the pre vs post comparison.
+        gm_mask_img (nibabel.Nifti1Image): Gray matter mask used in the analysis.
     """
     print("Starting combined first-level analysis...")
     
@@ -158,7 +183,10 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     fmri_data = image.concat_imgs(fmri_data_list)
     tr = metadata_list[0]["RepetitionTime"]
     n_volumes_pre = fmri_data_list[0].shape[3]
+    n_volumes_post = fmri_data_list[1].shape[3]
     n_scans = fmri_data.shape[3]
+    # Use metadata from the first session (assuming same TR)
+    metadata = metadata_list[0]
 
     # Preprocess pre 
     pre_events = events_list[0]
@@ -168,33 +196,39 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
 
     # Preprocess post
     post_events = events_list[1]
-    post_events['onset'] += pre_duration  # shift onsets forward
     post_events = events_to_stimuli(post_events, )
     post_events = contrast_type.preprocess_stimuli(post_events, run_label='post')
 
+
+    # Generate confounds regressor for per and post separately
+    pre_conf_matrix = create_design_matrix(n_volumes_pre, None, metadata, confounds_list[0])
+    post_conf_matrix = create_design_matrix(n_volumes_post, None, metadata, confounds_list[1])
+
     # Concatenate events
+    post_events['onset'] += pre_duration  # shift onsets forward
     events = pd.concat([pre_events, post_events], ignore_index=True)
 
-    # Use metadata from the first session (assuming same TR)
-    metadata = metadata_list[0]
+    # Rename confound columns to avoid duplicates
+    pre_conf_matrix = pre_conf_matrix.add_prefix('pre_')
+    post_conf_matrix = post_conf_matrix.add_prefix('post_')
 
-    # Concatenate confounds
-    confounds = pd.concat(confounds_list, ignore_index=True)
+    # Concatenate confounds + fill nans with 0
+    confounds = pd.concat([pre_conf_matrix, post_conf_matrix], ignore_index=True)
+    confounds = confounds.fillna(0)
 
-    # Add session regressor
-    session_regressors = pd.DataFrame({
-    'session_post': [0] * n_volumes_pre + [1] * (n_scans - n_volumes_pre),
-    })
-    confounds = pd.concat([confounds.reset_index(drop=True), session_regressors], axis=1)
+    # Generate event design matrix
+    design_matrix = create_design_matrix(n_scans, events, metadata, confounds, drift_model=None, high_pass=None)
 
-    # Create design matrix
-    design_matrix = create_design_matrix(n_scans, events, metadata, confounds)
+    # drop intercept column to avoid collinearity
+    if 'constant' in design_matrix.columns:
+        design_matrix = design_matrix.drop(columns=['constant'])
 
     # Create mask
     if hippocampus_only:
         gm_mask_img = create_hippocampal_gm_mask(fmri_data)
     else:
         gm_mask_img = create_gm_mask(fmri_data)
+    
 
     # Fit GLM
     fmri_glm = FirstLevelModel(mask_img=gm_mask_img, smoothing_fwhm=smoothing_fwhm, n_jobs=-1)
@@ -203,12 +237,18 @@ def combined_first_level_analysis(fmri_data_list, events_list, metadata_list, co
     print("Fitted FirstLevelModel.")
 
     contrast_vec = contrast_type.get_vector(design_matrix, combined=True)
-    # take the last element of the dict if multiple contrasts are returned
-    if isinstance(contrast_vec, dict):
-        contrast_vec = list(contrast_vec.values())[-1]
-    contrast = fmri_glm.compute_contrast(contrast_vec, output_type='z_score')
 
-    return fmri_glm, contrast
+    if contrast_type not in {ContrastType.PER_TRIAL, ContrastType.ORDER}:
+        pre_contrast = fmri_glm.compute_contrast(contrast_vec['Pre_' + contrast_type.value], output_type='z_score')
+        post_contrast = fmri_glm.compute_contrast(contrast_vec['Post_' + contrast_type.value], output_type='z_score')
+        pre_post_contrast = fmri_glm.compute_contrast(contrast_vec['Pre_vs_Post_' + contrast_type.value], output_type='z_score')
+    else:
+        # We do not compute contrasts for per_trial and order here we will use this for RSA analysis
+        pre_contrast = None
+        post_contrast = None
+        pre_post_contrast = None
+
+    return fmri_glm, pre_contrast, post_contrast, pre_post_contrast, gm_mask_img
 
 def first_level_analysis(fmri_data, events, metadata, confounds, contrast_type: ContrastType, smoothing_fwhm=None, hippocampus_only=False):
     """
@@ -288,7 +328,7 @@ def compute_pre_post_contrast(pre_contrast, post_contrast):
     diff_contrast = image.math_img("post - pre", post=post_resampled, pre=pre_contrast)
     return diff_contrast
 
-def get_old_trials_idx(sub: str, session: str):
+def get_old_trials_idx(sub: str, session: str = 'ses-01'):
     """
     Get indices of old trials from the events file.
     Args:
@@ -299,7 +339,7 @@ def get_old_trials_idx(sub: str, session: str):
     """
     path = download_event_file(sub, session)
     events = pd.read_csv(path, sep='\t')
-    old_trials = events[events['trial_type'] == 'old']
+    old_trials = events[events['event'].str.contains('old')]
     old_trials_idx = old_trials.index.tolist()
     print(f"Found {len(old_trials_idx)} old trials for {sub} in {session}.")
     return old_trials_idx

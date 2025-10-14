@@ -2,50 +2,51 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
-def transform_trial_to_contrast(events, c1 : str, c2: str):
+_CONTRAST_MAP = {
+    "old_vs_new": ("old", "new"),
+    "faces_vs_objects": ("_h_", "_o_"),
+    "relevance_vs_irrelevance": ("_r_", "_nr_"),
+    "per_trial": ("_", "NONE"),
+    "order": ("trial", "NONE"),
+    "new_faces_vs_objects": ("_h_v1_new", "_o_v1_new"),
+}
 
-    # Special case for 'order' contrast: rename trials to trial_1, trial_2, ...
-    if c1 == 'order':
+def transform_trial_to_contrast(events, c1: str, c2: str):
+    """Rename trial types to represent the contrast conditions."""
+    if c1 == 'trial':
         events = events.sort_values(by='onset').reset_index(drop=True)
-        events['trial_type'] = ['trial_' + str(i+1) for i in range(len(events))]
+        events['trial_type'] = ['trial_' + str(i + 1) for i in range(len(events))]
         return events
-    
-    # Create boolean masks for the two conditions
-    mask_old = events['trial_type'].str.contains(c1, case=False, na=False)
-    mask_new = events['trial_type'].str.contains(c2, case=False, na=False)
-    mask_other = ~(mask_old | mask_new)
 
-    events['trial_type'] = np.where(mask_old, c1, np.where(mask_new, c2, events['trial_type']))
+    mask1 = events['trial_type'].str.contains(c1, case=False, na=False)
+    mask2 = events['trial_type'].str.contains(c2, case=False, na=False)
+    mask_other = ~(mask1 | mask2)
 
-    # Report any unmatched trials
+    events['trial_type'] = np.where(mask1, c1, np.where(mask2, c2, events['trial_type']))
+
     if mask_other.any():
-        unmatched_trials = events['trial_type'][mask_other].unique()
-        print(f"Found trials that don't belong to '{c1}' or '{c2}': {unmatched_trials}")
+        unmatched = events.loc[mask_other, 'trial_type'].unique()
+        print(f"Found trials that don't belong to '{c1}' or '{c2}': {unmatched}")
 
     return events
 
-# Define your category groups
-human_categories = ['pirate', 'viking', 'maya']
-object_categories = ['food', 'wealth', 'drink']
+
+# Define category groups
+HUMAN_CATEGORIES = ['pirate', 'viking', 'maya']
+OBJECT_CATEGORIES = ['food', 'wealth', 'drink']
+
 
 def categorize_and_replace(trial):
     """Convert strings like 'wealth_9_new' to '_o_v1_new.jpg' or '_h_v1_new.jpg'."""
-    trial_lower = trial.lower()
-    if 'new' not in trial_lower:
-        return trial  # leave non-new trials unchanged
-
-    # Check if the trial contains any human category
-    for h in human_categories:
-        if h in trial_lower:
-            return '_h_v1_new.jpg'
-
-    # Check if the trial contains any object category
-    for o in object_categories:
-        if o in trial_lower:
-            return '_o_v1_new.jpg'
-
-    # If neither matches, throw an error
+    trial = trial.lower()
+    if 'new' not in trial:
+        return trial
+    if any(h in trial for h in HUMAN_CATEGORIES):
+        return '_h_v1_new.jpg'
+    if any(o in trial for o in OBJECT_CATEGORIES):
+        return '_o_v1_new.jpg'
     raise ValueError(f"⚠️ Unrecognized category in trial_type: {trial}")
+
 
 class ContrastType(Enum):
     OLD_VS_NEW = "old_vs_new"
@@ -55,145 +56,68 @@ class ContrastType(Enum):
     ORDER = "order"
     NEW_FACES_VS_OBJECTS = "new_faces_vs_objects"
 
-
+    # --- helper maps for contrasts ---
 
     def preprocess_stimuli(self, events: pd.DataFrame, run_label: str = None) -> pd.DataFrame:
-        """
-        Handle stimuli differently for each contrast and encode pre/post run.
-        
-        Parameters
-        ----------
-        events : pd.DataFrame
-            Event file with at least a 'trial_type' column.
-        run_label : str
-            Label for the run, e.g., 'pre' or 'post'.
-            
-        Returns
-        -------
-        pd.DataFrame
-            Events DataFrame with updated 'trial_type' column.
-        """
-
-        # We need to handle the fact that new stimuli are not labeled as human/object
+        """Prepare events table according to contrast type."""
         events['trial_type'] = events['trial_type'].astype(str).apply(categorize_and_replace)
-
-        if self == ContrastType.OLD_VS_NEW:
-            c1, c2 = 'old', 'new'
-        elif self == ContrastType.FACES_VS_OBJECTS:
-            c1, c2 = '_h_', '_o_'
-        elif self == ContrastType.RELEVANCE_VS_IRRELEVANCE:
-            c1, c2 = '_r_', '_nr_'
-        elif self == ContrastType.PER_TRIAL:
-            c1, c2 = 'trial', 'trial'
-        elif self == ContrastType.ORDER:
-            c1, c2 = 'order', 'order'
-        elif self == ContrastType.NEW_FACES_VS_OBJECTS:
-            c1, c2 = '_h_v1_new', '_o_v1_new'
-        else:
-            raise ValueError(f"Unknown stimuli handling for {self}")
-
+        c1, c2 = _CONTRAST_MAP[self.value]
         events = transform_trial_to_contrast(events, c1, c2)
 
-        # Encode run (pre/post) in trial_type
-        if run_label is not None:
-            events['trial_type'] = run_label + '_' + events['trial_type']
+        if run_label:
+            events['trial_type'] = f"{run_label}_" + events['trial_type']
 
-        # Print the number of trials per condition c1 and c2
-        count_c1 = (events['trial_type'].str.contains(c1, case=False, na=False)).sum()
-        count_c2 = (events['trial_type'].str.contains(c2, case=False, na=False)).sum()
-        print(f"Found {count_c1} trials for condition '{c1}' and {count_c2} trials for condition '{c2}'")
+        n1 = events['trial_type'].str.contains(c1, case=False, na=False).sum()
+        n2 = events['trial_type'].str.contains(c2, case=False, na=False).sum()
+        print(f"Found {n1} trials for '{c1}' and {n2} trials for '{c2}'")
 
         return events
 
+    # --- helper to build weights ---
+    @staticmethod
+    def _build_weights(columns, include, exclude):
+        """Return a weight vector for a simple contrast."""
+        return np.array([
+            1 if (include[0] in c and all(e not in c for e in exclude))
+            else -1 if (include[1] in c and all(e not in c for e in exclude))
+            else 0
+            for c in columns
+        ])
+
     def get_vector(self, design_matrix, combined=False):
-        """Return the contrast weights vector for a design matrix using 1, -1, 0"""
         columns = design_matrix.columns.tolist()
-        
-        if self == ContrastType.OLD_VS_NEW:
-            if combined:
-                # create three sets of weights to compare old vs new in each run + the difference between runs
-                pre_weights = np.array([
-                    1 if 'pre_old' in c else (-1 if 'pre_new' in c else 0) for c in columns
-                ])
-                post_weights = np.array([
-                    1 if 'post_old' in c else (-1 if 'post_new' in c else 0) for c in columns
-                ])
-                pre_vs_post_weights = post_weights - pre_weights
-                # Combine weights into a dictionary
-                weights = {
-                    "Pre_Old_vs_New_Effect": pre_weights,
-                    "Post_Old_vs_New_Effect": post_weights,
-                    "Pre_vs_Post_Old_vs_New_Effect": pre_vs_post_weights
-                }
-            else:
-                weights =  np.array([1 if 'old' in c else (-1 if 'new' in c else 0) for c in columns])
+        c1, c2 = _CONTRAST_MAP[self.value]
+        exclude_terms = ['derivative', 'dispersion']
 
-        elif self == ContrastType.FACES_VS_OBJECTS:
-            if combined:
-                # create three sets of weights to compare faces vs objects in each run + the difference between runs
-                pre_weights = np.array([
-                    1 if 'pre__h' in c else (-1 if 'pre__o' in c else 0) for c in columns
-                ])
-                post_weights = np.array([
-                    1 if 'post__h' in c else (-1 if 'post__o' in c else 0) for c in columns
-                ])
-                pre_vs_post_weights = post_weights - pre_weights
-                # Combine weights into a single array (you can choose which one to return based on your needs)
-                weights = {
-                    "Pre_Faces_vs_Objects_Effect": pre_weights,
-                    "Post_Faces_vs_Objects_Effect": post_weights,
-                    "Pre_vs_Post_Faces_vs_Objects_Effect": pre_vs_post_weights
-                }
+        def run_weights(run):
+            # handle contrasts order separately
+            if self == ContrastType.ORDER:
+                # for order we want to compute a contrast for each trial against all others
+                nb_trials = sum(1 for c in columns if f"{run}_trial_" in c and all(e not in c for e in exclude_terms))
+                weights = {}
+                for i in range(1, nb_trials + 1):
+                    weights[f"{run}_trial_{i}"] = self._build_weights(
+                        columns,
+                        (f"{run}_trial_{i}", f"NONE"),
+                        exclude_terms
+                    )
+                return weights
             else:
-                weights = np.array([1 if '_h_' in c else (-1 if '_o_' in c else 0) for c in columns])
+                return self._build_weights(columns, (f"{run}_{c1}", f"{run}_{c2}"), exclude_terms)
 
-        elif self == ContrastType.RELEVANCE_VS_IRRELEVANCE:
-            if combined:
-                # create three sets of weights to compare relevant vs irrelevant in each run + the difference between runs
-                pre_weights = np.array([
-                    1 if 'pre__r' in c else (-1 if 'pre__nr' in c else 0) for c in columns
-                ])
-                post_weights = np.array([
-                    1 if 'post__r' in c else (-1 if 'post__nr' in c else 0) for c in columns
-                ])
-                pre_vs_post_weights = post_weights - pre_weights
-                # Combine weights into a single array (you can choose which one to return based on your needs)
-                weights = {
-                    "Pre_Relevance_vs_Irrelevance_Effect": pre_weights,
-                    "Post_Relevance_vs_Irrelevance_Effect": post_weights,
-                    "Pre_vs_Post_Relevance_vs_Irrelevance_Effect": pre_vs_post_weights
+        if combined:
+            pre = run_weights('pre')
+            post = run_weights('post')
+            if self == ContrastType.ORDER:
+                # merge the two dicts
+                print(f"Generated {len(pre)} contrasts for pre and {len(post)} contrasts for post.")
+                pre.update({k : v for k, v in post.items()})
+                return pre
+            else:
+                return {
+                    f"Pre_{self.value}": pre,
+                    f"Post_{self.value}": post,
+                    f"Pre_vs_Post_{self.value}": post - pre
                 }
-            else:
-                weights = np.array([1 if '_r_' in c else (-1 if '_nr_' in c else 0) for c in columns])
-        elif self == ContrastType.PER_TRIAL:
-            if combined : 
-                weights = {'Trial_Effect': np.array([1 if 'trial' in c else 0 for c in columns])}
-            else:
-                weights = np.array([1 if 'trial' in c else 0 for c in columns])
-        elif self == ContrastType.ORDER:
-            if combined:
-                weights = {'Baseline' : np.array([1 if 'trial' in c else 0 for c in columns])}
-            else:
-               weights = np.array([1 if 'trial' in c else 0 for c in columns])
-        elif self == ContrastType.NEW_FACES_VS_OBJECTS:
-            if combined:
-                # create three sets of weights to compare faces vs objects in each run + the difference between runs
-                pre_weights = np.array([
-                    1 if 'pre__h_v1_new' in c else (-1 if 'pre__o_v1_new' in c else 0) for c in columns
-                ])
-                post_weights = np.array([
-                    1 if 'post__h_v1_new' in c else (-1 if 'post__o_v1_new' in c else 0) for c in columns
-                ])
-                pre_vs_post_weights = post_weights - pre_weights
-                # Combine weights into a single array (you can choose which one to return based on your needs)
-                weights = {
-                    "Pre_New_Faces_vs_Objects_Effect": pre_weights,
-                    "Post_New_Faces_vs_Objects_Effect": post_weights,
-                    "Pre_vs_Post_New_Faces_vs_Objects_Effect": pre_vs_post_weights
-                }
-            else:
-                weights = np.array([1 if '_h_v1_new' in c else (-1 if '_o_v1_new' in c else 0) for c in columns])
         else:
-            raise ValueError(f"No weights defined for {self}")
-                
-        return weights
+            return self._build_weights(columns, (c1, c2), exclude_terms)

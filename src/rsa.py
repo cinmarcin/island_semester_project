@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+from tqdm import tqdm
 
 def create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=False):
     """
@@ -76,13 +77,41 @@ def correlation_within_repetitions(correlation_matrix, trial_per_repetition=64, 
     print(f"Overall average correlation within all repetitions: {overall_avg_correlation:.4f}")
     return overall_avg_correlation
 
-def extract_beta_maps(fmri_glm):
+def extract_beta_maps(fmri_glm, idxs=None, run_label=None):
+    """
+    Extract beta maps for specified trial indices from a fitted GLM model.
+    Parameters
+    ----------
+    fmri_glm : FirstLevelModel
+        Fitted GLM model from nilearn.
+    idxs : list of int, optional
+        List of trial indices to extract. If None, all trials are extracted.
+    run_label : str, optional
+        Label for the run (e.g., 'pre' or 'post') to filter trials. If None, no filtering is applied.
+    Returns
+    -------
+    np.ndarray
+        Array of shape (n_trials, n_voxels) containing the extracted beta maps.
+    """
     print("Extracting beta maps...")
+    exclude = ['derivative', 'dispersion']
     # Get column names
     columns = fmri_glm.design_matrices_[0].columns
-    trial_columns = [i for i, col in enumerate(columns) if "trial_" in col]
+    # Filter columns for trials
+    if run_label is not None and idxs is not None:
+        trial_columns = [
+            i
+            for i, col in enumerate(columns)
+            if any(f"{run_label}_trial_{idx+1}" == col for idx in idxs)
+            and all(e not in col for e in exclude)
+        ]
+    else:
+        trial_columns = [
+        i for i, col in enumerate(columns)
+        if 'trial_' in col and all(e not in col for e in exclude)  # all trials
+        ]
     beta_maps_list = []
-    for i in trial_columns:
+    for i in tqdm(trial_columns):
         contrast_vector = np.zeros(len(columns))
         contrast_vector[i] = 1
         beta_map = fmri_glm.compute_contrast(contrast_vector, output_type='effect_size')

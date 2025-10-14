@@ -135,13 +135,13 @@ def download_event_file(sub, session):
         session (str): Session identifier (e.g., 'ses-01').
     """
     remote_base_path = f"boesch@miplabsrv3:/media/RCPNAS/Data3/Alison_island/bids_ackbar/"
-    remote_events_file = os.path.join(remote_base_path, f"{sub}/{session}/func/{sub}_{session}_task-memory_events.tsv")
+    remote_events_file = os.path.join(remote_base_path, f"{sub}/{session}/func/{sub}_{session}_task-viewing_run-01_events.tsv")
 
-    local_base_path = os.path.join('data/raw', sub, 'func')
+    local_base_path = os.path.join('data/preprocessed', sub, 'func')
     os.makedirs(local_base_path, exist_ok=True)
 
     scp_command = f"scp {remote_events_file} {local_base_path}/"
     print(f"Executing command: {scp_command}")
     os.system(scp_command)
     print(f"Downloaded event file for {sub}, {session} to {local_base_path}.")
-    return os.path.join(local_base_path, f"{sub}_{session}_task-memory_events.tsv")
+    return os.path.join(local_base_path, f"{sub}_{session}_task-viewing_run-01_events.tsv")
