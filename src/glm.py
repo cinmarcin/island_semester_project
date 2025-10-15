@@ -109,6 +109,7 @@ def events_to_stimuli(events):
     """
     events = events.iloc[:,0:3]
     events.columns = ['onset', 'duration', 'trial_type']
+    events = events.sort_values(by='onset').reset_index(drop=True)
     return events
 
 def create_design_matrix(n_scans, events, metadata, confounds, drift_model="cosine", high_pass=0.01):
@@ -327,19 +328,3 @@ def compute_pre_post_contrast(pre_contrast, post_contrast):
     post_resampled = image.resample_to_img(post_contrast, pre_contrast, interpolation='nearest', force_resample=True, copy_header=True)
     diff_contrast = image.math_img("post - pre", post=post_resampled, pre=pre_contrast)
     return diff_contrast
-
-def get_old_trials_idx(sub: str, session: str = 'ses-01'):
-    """
-    Get indices of old trials from the events file.
-    Args:
-        sub (str): Subject identifier.
-        session (str): Session identifier ('ses-01' or 'ses-05').
-    Returns:
-        old_trials_idx (list of int): List of indices corresponding to old trials.
-    """
-    path = download_event_file(sub, session)
-    events = pd.read_csv(path, sep='\t')
-    old_trials = events[events['event'].str.contains('old')]
-    old_trials_idx = old_trials.index.tolist()
-    print(f"Found {len(old_trials_idx)} old trials for {sub} in {session}.")
-    return old_trials_idx

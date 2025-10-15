@@ -6,16 +6,24 @@ _CONTRAST_MAP = {
     "old_vs_new": ("old", "new"),
     "faces_vs_objects": ("_h_", "_o_"),
     "relevance_vs_irrelevance": ("_r_", "_nr_"),
-    "per_trial": ("_", "NONE"),
-    "order": ("trial", "NONE"),
+    "per_trial": (".jpg", "NONE"),
+    "order": (".jpg", "NONE"),
     "new_faces_vs_objects": ("_h_v1_new", "_o_v1_new"),
 }
 
 def transform_trial_to_contrast(events, c1: str, c2: str):
     """Rename trial types to represent the contrast conditions."""
-    if c1 == 'trial':
-        events = events.sort_values(by='onset').reset_index(drop=True)
-        events['trial_type'] = ['trial_' + str(i + 1) for i in range(len(events))]
+    if c1 == '.jpg':
+        # dictionary to count repetitions per event
+        counter = {}
+        
+        # function to generate trial_type with repetitions
+        def trial_type_with_rep(event):
+            counter[event] = counter.get(event, 0) + 1
+            return f"rep{counter[event]}_{event}"
+        
+        # apply to create trial_type column
+        events['trial_type'] = events['trial_type'].apply(trial_type_with_rep)
         return events
 
     mask1 = events['trial_type'].str.contains(c1, case=False, na=False)
@@ -60,7 +68,8 @@ class ContrastType(Enum):
 
     def preprocess_stimuli(self, events: pd.DataFrame, run_label: str = None) -> pd.DataFrame:
         """Prepare events table according to contrast type."""
-        events['trial_type'] = events['trial_type'].astype(str).apply(categorize_and_replace)
+        if self == ContrastType.NEW_FACES_VS_OBJECTS:
+            events['trial_type'] = events['trial_type'].astype(str).apply(categorize_and_replace)
         c1, c2 = _CONTRAST_MAP[self.value]
         events = transform_trial_to_contrast(events, c1, c2)
 
@@ -92,16 +101,8 @@ class ContrastType(Enum):
         def run_weights(run):
             # handle contrasts order separately
             if self == ContrastType.ORDER:
-                # for order we want to compute a contrast for each trial against all others
-                nb_trials = sum(1 for c in columns if f"{run}_trial_" in c and all(e not in c for e in exclude_terms))
-                weights = {}
-                for i in range(1, nb_trials + 1):
-                    weights[f"{run}_trial_{i}"] = self._build_weights(
-                        columns,
-                        (f"{run}_trial_{i}", f"NONE"),
-                        exclude_terms
-                    )
-                return weights
+                # return empty weights order is used for RSA only
+                return {}
             else:
                 return self._build_weights(columns, (f"{run}_{c1}", f"{run}_{c2}"), exclude_terms)
 
@@ -109,10 +110,9 @@ class ContrastType(Enum):
             pre = run_weights('pre')
             post = run_weights('post')
             if self == ContrastType.ORDER:
-                # merge the two dicts
-                print(f"Generated {len(pre)} contrasts for pre and {len(post)} contrasts for post.")
-                pre.update({k : v for k, v in post.items()})
-                return pre
+                # return empty weights order is used for RSA only
+                print("Returning empty weights for ORDER contrast")
+                return {}
             else:
                 return {
                     f"Pre_{self.value}": pre,

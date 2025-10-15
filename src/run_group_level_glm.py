@@ -54,7 +54,7 @@ list_of_subs = [
         #        'sub-P26', missing event file
                 'sub-P27',
         #        'sub-P30', incomplete data
-                'sub-P31',
+            #    'sub-P31',
                 'sub-P34',
                 'sub-P35',
                 'sub-P36',

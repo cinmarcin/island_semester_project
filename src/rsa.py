@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import pandas as pd
 from tqdm import tqdm
+from utils.judgment_distances import load_memory_data
 
 def create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=False):
     """
@@ -77,64 +78,63 @@ def correlation_within_repetitions(correlation_matrix, trial_per_repetition=64, 
     print(f"Overall average correlation within all repetitions: {overall_avg_correlation:.4f}")
     return overall_avg_correlation
 
-def extract_beta_maps(fmri_glm, idxs=None, run_label=None):
+def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None):
     """
     Extract beta maps for specified trial indices from a fitted GLM model.
+    
     Parameters
     ----------
     fmri_glm : FirstLevelModel
         Fitted GLM model from nilearn.
-    idxs : list of int, optional
-        List of trial indices to extract. If None, all trials are extracted.
+    filter_labels : list of str, optional
+        List of trial labels to extract. If None, all trials are extracted.
     run_label : str, optional
         Label for the run (e.g., 'pre' or 'post') to filter trials. If None, no filtering is applied.
+    
     Returns
     -------
-    np.ndarray
-        Array of shape (n_trials, n_voxels) containing the extracted beta maps.
+    dict
+        Dictionary mapping trial names to flattened beta maps (1D arrays).
     """
     print("Extracting beta maps...")
     exclude = ['derivative', 'dispersion']
     # Get column names
     columns = fmri_glm.design_matrices_[0].columns
-    # Filter columns for trials
-    if run_label is not None and idxs is not None:
-        trial_columns = [
-            i
-            for i, col in enumerate(columns)
-            if any(f"{run_label}_trial_{idx+1}" == col for idx in idxs)
-            and all(e not in col for e in exclude)
-        ]
+    # Only keep columns if contains any of the filter_labels
+    if filter_labels is not None:
+        idxs = [i for i, col in enumerate(columns) 
+                if run_label in col and ".jpg" in col 
+                and any(label in col for label in filter_labels) 
+                and all(e not in col for e in exclude)]
     else:
-        trial_columns = [
-        i for i, col in enumerate(columns)
-        if 'trial_' in col and all(e not in col for e in exclude)  # all trials
-        ]
-    beta_maps_list = []
-    for i in tqdm(trial_columns):
+        idxs = [i for i, col in enumerate(columns) 
+                if run_label in col and ".jpg" in col 
+                and all(e not in col for e in exclude)]
+
+    beta_maps_dict = {}
+
+    for i in tqdm(idxs, desc="Extracting beta maps"):
         contrast_vector = np.zeros(len(columns))
         contrast_vector[i] = 1
         beta_map = fmri_glm.compute_contrast(contrast_vector, output_type='effect_size')
-        beta_maps_list.append(beta_map)
+        beta_maps_dict[columns[i]] = beta_map
 
-    beta_maps = np.stack([bm.get_fdata() for bm in beta_maps_list], axis=-1)
-    print(f"Extracted {beta_maps.shape[-1]} beta maps with shape {beta_maps.shape[:-1]} flattened for similarity computation.")
+    # flatten beta maps for each trial
+    trial_data_dict = {name: bm.get_fdata().ravel() for name, bm in beta_maps_dict.items()}
+    print(f"Extracted {len(trial_data_dict)} beta maps.")
 
-    # flatten beta maps for similarity computation
-    n_voxels = np.prod(beta_maps.shape[:-1])
-    n_trials = beta_maps.shape[-1]
-    trial_data = beta_maps.reshape((n_voxels, n_trials)).T  #
-    return trial_data
+    return trial_data_dict
 
-def get_model_rdm(sub: str, path_to_raw_data, spatial=True, min_confidence=0):
+
+def get_model_rdm(sub: str, spatial=True, min_confidence=0, save_path=None):
     """
     Compute model matrices for a given subject on its judgment distances.
     Parameters
     ----------
     sub : str
         Subject identifier.
-    path_to_raw_data : str
-        Path to the raw data directory.
+    path_to_preprocessed_data : str
+        Path to the preprocessed data directory.
     spatial : bool
         Whether to compute spatial or temporal RDMs.
     min_confidence : float
@@ -143,50 +143,190 @@ def get_model_rdm(sub: str, path_to_raw_data, spatial=True, min_confidence=0):
     -------
     np.ndarray
         The computed RDM matrix.
-    selected_trials : np.ndarray
-        The trials that were included in the RDM computation.
+    filtered_trials : np.ndarray
+        The trials that were included after filtering.
     """
     from scipy.spatial.distance import pdist, squareform
-    df = pd.read_csv(path_to_raw_data)
-    df = df[df['Participant'] == sub]
+
+    # Load preprocessed data
+    raw_df = load_memory_data()
+
+    # Careful here sub is given as 'sub-PXX' but in the dataframe it's just 'PXX'
+    sub = sub.replace('sub-', '')
+    # Filter for the specific subject
+    sub_df = raw_df[raw_df['Participant'] == sub].copy()
+
+    # Filter for only correctly classified as old trials
+    df = sub_df[(sub_df['Classified as old'] == 1) & (sub_df['Old'] == 1)].copy()
+
+    filtered_trials = df['V4'].copy()
+    print(f"Subject {sub} has {len(filtered_trials)} trials after filtering for correctly classified old items.")
 
     if spatial:
         df = df[df['Placed Confidence'] >= min_confidence]
-        selected_trials = df['V4'].unique()
         df = df[['X', 'Y', 'Z', 'Placed Confidence']]
         judged_positions = df[['X', 'Y', 'Z']].to_numpy()
-
     else:
-        df = df[df['Timed (days)'] != 100]
         df = df[df['Timed Confidence'] >= min_confidence]
-
         if len(df) < 2:
             raise ValueError(f'Participant {sub} has less than 2 valid temporal judgments & should probably be discarded.')
         
-        selected_trials = df['V4'].unique()
-        df = df[['Timed (days)', 'Timed Confidence']]
-        judged_positions = df[['Timed (days)']].to_numpy()
+        df = df[['Timed', 'Timed Confidence']]
+        judged_positions = df[['Timed']].to_numpy()
 
-    dist_matrix = squareform(pdist(judged_positions))
+    dist_matrix = squareform(pdist(judged_positions, metric='euclidean'))
+    np.save(save_path, dist_matrix)
 
-    return dist_matrix, selected_trials
+    if save_path is not None:
+        rdm_type = 'spatial' if spatial else 'temporal'
+        plt.imshow(dist_matrix, cmap='viridis')
+        plt.colorbar(label='Dissimilarity')
+        plt.title(f'{rdm_type.capitalize()} RDM for {sub}{" with min confidence " + str(min_confidence) if min_confidence > 0 else ""}')
+        plt.xlabel('Trial Index')
+        plt.ylabel('Trial Index')
+        plot_path = str(save_path).replace('.npy', '.png')
+        plt.savefig(plot_path)
+        plt.close()
+        print(f"Saved {rdm_type} RDM plot to {plot_path}")
 
-def compute_rsa(beta_maps, beta_maps_idxs):
+    return dist_matrix, filtered_trials
+
+def compute_rsa(beta_maps_dict, save_path=None):
     """
     Compute Representational Similarity Analysis (RSA) by spearman correlating beta maps. 
     Only correlate the beta map of a trial with every other trial in every other repetition.
     Parameters
     ----------
-    beta_maps : np.ndarray
-        Array of shape (n_repetitions * n_trials, n_voxels) containing the beta maps.
-    beta_maps_idxs : np.ndarray
-        2D array of shape (n_repetitions, n_trials) containing the indices of beta maps.
+    beta_maps_dict : dict
+        Dictionary mapping trial names to flattened beta maps (1D arrays).
+    save_path : str, optional
+        Path to save the computed RSA matrix. If None, the matrix is not saved.
     Returns 
     -------
     np.ndarray
         The computed correlation matrix in the shape (n_trials, n_trials).
     """
     from scipy.stats import spearmanr
-    n_trials = beta_maps_idxs.shape[1]
+    beta_maps = get_ordered_array_from_beta_dict(beta_maps_dict)
     correlation_matrix = spearmanr(beta_maps, axis=1).correlation
-    return correlation_matrix
+    n_repetitions, n_trials = 6, int(len(beta_maps_dict) / 6)
+    beta_maps_idxs = np.array([[i + r * n_trials for i in range(n_trials)] for r in range(n_repetitions)])
+    # We only want to keep the correlations between different repetitions
+    rsa_matrix = np.zeros((n_trials, n_trials))
+    for i in range(n_trials):
+        for j in range(i, n_trials):
+            correlations = []
+            for r1 in range(n_repetitions):
+                for r2 in range(n_repetitions):
+                    if r1 != r2:
+                        correlations.append(correlation_matrix[beta_maps_idxs[r1, i], beta_maps_idxs[r2, j]])
+            rsa_matrix[i, j] = np.mean(correlations)
+            rsa_matrix[j, i] = rsa_matrix[i, j]  # Symmetric matrix
+    print(f"Computed RSA matrix with shape {rsa_matrix.shape}")
+    if save_path is not None:
+        np.save(save_path, rsa_matrix)
+        plot_path = str(save_path).replace('.npy', '.png')
+        create_rsa_figure(rsa_matrix, title='RSA Matrix', save_path=plot_path)
+        print(f"Saved RSA matrix to {save_path}")
+    return rsa_matrix
+
+
+def create_rsa_figure(rsa_matrix, title, save_path):
+    """
+    Create and optionally save a figure of the RSA matrix.
+    Parameters
+    ----------
+    rsa_matrix : np.ndarray
+        The RSA matrix to visualize.
+    title : str
+        Title for the plot.
+    save_path : str
+        Path to save the figure. If None, the figure is not saved.
+    """
+    plt.figure(figsize=(8, 6))
+    plt.imshow(rsa_matrix, cmap='viridis', aspect='auto')
+    plt.colorbar(label='RSA Correlation')
+    plt.title(title)
+    plt.xlabel('Trial Index')
+    plt.ylabel('Trial Index')
+    plt.savefig(save_path)
+    print(f"Saved RSA figure to {save_path}")
+    plt.close()
+
+
+def compute_rsa_from_glm(fmri_glm, sub, filtered_trials, pre_save_path, n_repetitions=6, downsample=False):
+    """
+    Compute RSA from a fitted GLM model by extracting beta maps for old trials and correlating them.
+    Parameters
+    ----------
+    fmri_glm : FirstLevelModel
+        Fitted GLM model from nilearn.
+    sub : str
+        Subject identifier.
+    filtered_trials : list of str
+        List of trials to include based on previous filtering.
+    n_trials : int
+        Number of unique trials.
+    n_repetitions : int
+        Number of repetitions per trial.
+    pre_save_path : str
+        Path to save the computed RSA matrix for the pre run. If None, the matrix is not saved.
+    downsample : bool
+        Whether to downsample the trials for testing purposes.
+    Returns
+    -------
+    pre_rsa : np.ndarray
+        The computed RSA matrix for the pre run.
+    post_rsa : np.ndarray
+        The computed RSA matrix for the post run.
+    """
+    # Transform filtered idxs to include all repetitions
+    if downsample:
+        filtered_trials = filtered_trials[0] # only keep the first trial for test purposes
+
+    n_tasks = len(filtered_trials)
+    print(f"Computing RSA Matrix for sub : {sub}, retrieved {n_tasks} tasks and {n_repetitions} repetitions")
+    
+
+    # Extract beta maps for old trials only
+    pre_beta_maps = extract_beta_maps(fmri_glm, filter_labels=filtered_trials, run_label='pre')
+    post_beta_maps = extract_beta_maps(fmri_glm, filter_labels=filtered_trials, run_label='post')
+
+    # Correlate every beta maps with every other beta maps of every other repetition
+    pre_rsa = compute_rsa(pre_beta_maps, save_path=pre_save_path)
+    print(f"Pre RSA shape: {pre_rsa.shape}")
+    post_save_path = str(pre_save_path).replace('pre', 'post')
+    post_rsa = compute_rsa(post_beta_maps, save_path=post_save_path)
+    print(f"Post RSA shape: {post_rsa.shape}")
+    return pre_rsa, post_rsa
+
+def get_ordered_array_from_beta_dict(beta_maps_dict):
+    # Parse trial names and repetitions
+    reps = []
+    trials = []
+    run_label = 'pre' if 'pre' in next(iter(beta_maps_dict.keys())) else 'post'
+    for key in beta_maps_dict.keys():
+        # take the second part of the key split by '_'
+        keys_split = key.split('_')
+        rep_idx = keys_split[1] # first is run label
+        reps.append(rep_idx)
+        # trial name = everything after the repetition index
+        trial_name = '_'.join(keys_split[2:])
+        trials.append(trial_name)
+    
+    unique_reps = sorted(list(set(reps)))
+    unique_trials = sorted(list(set(trials)))
+    print(f"Identified {len(unique_trials)} unique trials and {len(unique_reps)} unique repetitions.")
+    print(f"Unique trials: {unique_trials}")
+    
+    # Build beta array in order rep x trial
+    print(beta_maps_dict.keys())
+    beta_array = np.zeros((len(unique_reps) * len(unique_trials), len(next(iter(beta_maps_dict.values())))))
+    for i, rep in enumerate(unique_reps):
+        for j, trial in enumerate(unique_trials):
+            key = f"{run_label}_{rep}_{trial}"
+            if key not in beta_maps_dict:
+                raise ValueError(f"Missing beta map for {key}")
+            beta_array[i * len(unique_trials) + j, :] = beta_maps_dict[key]
+    print(f"Constructed beta array with shape {beta_array.shape}")
+    return beta_array

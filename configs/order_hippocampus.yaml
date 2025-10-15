@@ -5,3 +5,4 @@ smoothing_fwhm: null            # in mm, null means no smoothing
 height_control: bonferroni      # or fdr
 p_value: 0.05                   # significance threshold
 hippocampus_only: true          # if true, restrict analysis to hippocampus
+save_rsa : true               # order glm can be huged it can be better to compute directly rsa matrix and save it without saving glm -> if save_rsa is true glm is not saved
