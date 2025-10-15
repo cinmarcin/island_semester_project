@@ -4,7 +4,10 @@ import pandas as pd
 import builtins
 import inspect
 import json
-
+import sys
+import numpy as np
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from paths import get_processed_data_file_path, get_model_rdm_path
 BLUE = "\033[34m"
 RESET = "\033[0m"
 
@@ -145,3 +148,30 @@ def download_event_file(sub, session):
     os.system(scp_command)
     print(f"Downloaded event file for {sub}, {session} to {local_base_path}.")
     return os.path.join(local_base_path, f"{sub}_{session}_task-viewing_run-01_events.tsv")
+
+
+def get_model_rdm(sub, config, config_file, spatial=False):
+    """
+    Load the model RDM (Representational Dissimilarity Matrix) for a given subject.
+    Args:
+        sub (str): Subject identifier (e.g., 'sub-P10').
+        spatial (bool): Whether to compute the spatial RDM. If False, computes temporal RDM.
+        config (dict): Configuration dictionary.
+        config_file (str): Path to the configuration file.
+    Returns:
+        rdm (numpy.ndarray): The computed or loaded RDM.
+    """
+    return np.load(get_model_rdm_path(sub=sub, spatial=spatial, config_file=config_file, config=config))
+
+def get_rsa_matrix(sub, config, config_file, run_label):
+    """
+    Load the RSA matrix for a given subject.
+    Args:
+        sub (str): Subject identifier (e.g., 'sub-P10').
+        config (dict): Configuration dictionary.
+        config_file (str): Path to the configuration file.
+        run_label (str): Label for the run/session (e.g., 'pre', 'post').
+    Returns:
+        rsa_matrix (numpy.ndarray): The RSA matrix.
+    """
+    return np.load(get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=sub, config=config, session=run_label))

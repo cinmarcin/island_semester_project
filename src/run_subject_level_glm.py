@@ -1,7 +1,7 @@
 import os
 from utils.data import load_subject_data, remove_subject_data
 from glm import combined_first_level_analysis
-from rsa import compute_rsa_from_glm, get_model_rdm
+from rsa import compute_rsa_from_glm, get_model_rdm, create_rsa_figure
 from nilearn.reporting import make_glm_report
 from nilearn.plotting import plot_design_matrix
 from joblib import dump, load
@@ -9,6 +9,7 @@ from contrast_types import ContrastType
 import argparse
 import yaml
 from paths import get_processed_data_file_path, get_processed_data_subject_folder, is_glm_computed, PRE_SES, POST_SES, get_model_rdm_path
+import numpy as np
 
 ## --------- GET ARGUMENTS
 parser = argparse.ArgumentParser()
@@ -56,8 +57,11 @@ for config_file in config_files:
         # Save results
         if SAVE_RSA:
             temporal_rdm, filtered_trials = get_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
-            spatial_rdm, _ = get_model_rdm(SUB, spatial=True, min_confidence=2, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
+            spatial_rdm, _ = get_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
             pre_rsa, post_rsa = compute_rsa_from_glm(fmri_glm, SUB, filtered_trials, pre_save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre'), n_repetitions=6)
+            contrast_rsa = post_rsa - pre_rsa
+            np.save(get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post'), contrast_rsa)
+            create_rsa_figure(contrast_rsa, f"{SUB} RSA Pre-Post Contrast", save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post').with_suffix('.png'))
         else:
             dump(fmri_glm, get_processed_data_file_path(config_file=config_file, analysis='glm', sub=SUB, config=config))
 

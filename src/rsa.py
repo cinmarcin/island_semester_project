@@ -113,7 +113,7 @@ def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None):
 
     beta_maps_dict = {}
 
-    for i in tqdm(idxs, desc="Extracting beta maps"):
+    for i in idxs:
         contrast_vector = np.zeros(len(columns))
         contrast_vector[i] = 1
         beta_map = fmri_glm.compute_contrast(contrast_vector, output_type='effect_size')
@@ -209,6 +209,7 @@ def compute_rsa(beta_maps_dict, save_path=None):
     from scipy.stats import spearmanr
     beta_maps = get_ordered_array_from_beta_dict(beta_maps_dict)
     correlation_matrix = spearmanr(beta_maps, axis=1).correlation
+    print(f"Computed correlation matrix with shape {correlation_matrix.shape}")
     n_repetitions, n_trials = 6, int(len(beta_maps_dict) / 6)
     beta_maps_idxs = np.array([[i + r * n_trials for i in range(n_trials)] for r in range(n_repetitions)])
     # We only want to keep the correlations between different repetitions
@@ -320,7 +321,6 @@ def get_ordered_array_from_beta_dict(beta_maps_dict):
     print(f"Unique trials: {unique_trials}")
     
     # Build beta array in order rep x trial
-    print(beta_maps_dict.keys())
     beta_array = np.zeros((len(unique_reps) * len(unique_trials), len(next(iter(beta_maps_dict.values())))))
     for i, rep in enumerate(unique_reps):
         for j, trial in enumerate(unique_trials):
