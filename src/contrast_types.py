@@ -7,13 +7,13 @@ _CONTRAST_MAP = {
     "faces_vs_objects": ("_h_", "_o_"),
     "relevance_vs_irrelevance": ("_r_", "_nr_"),
     "per_trial": (".jpg", "NONE"),
-    "order": (".jpg", "NONE"),
+    "order": ("_", "NONE"),
     "new_faces_vs_objects": ("_h_v1_new", "_o_v1_new"),
 }
 
 def transform_trial_to_contrast(events, c1: str, c2: str):
     """Rename trial types to represent the contrast conditions."""
-    if c1 == '.jpg':
+    if c1 == '_':
         # dictionary to count repetitions per event
         counter = {}
         
@@ -21,6 +21,9 @@ def transform_trial_to_contrast(events, c1: str, c2: str):
         def trial_type_with_rep(event):
             counter[event] = counter.get(event, 0) + 1
             return f"rep{counter[event]}_{event}"
+        
+        # take only the two first elements after splitting by '_'
+        events['trial_type'] = events['trial_type'].astype(str).apply(lambda x: '_'.join(x.split('_')[:2]))
         
         # apply to create trial_type column
         events['trial_type'] = events['trial_type'].apply(trial_type_with_rep)

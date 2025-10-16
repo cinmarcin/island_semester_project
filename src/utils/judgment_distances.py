@@ -42,13 +42,16 @@ def preprocess_and_save_memory_data():
         r'Stimuli Pos\s*:\s*\(\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\s*\)'
     ).astype(float).to_numpy()
 
+    # Add true time column 1 if e3 in V4, 7 if e2 in V4, 14 if e1 in V4
+    df = df.copy()
+    df.loc[:, 'True Time'] = df['V4'].map(lambda x: 0 if 'e3' in x else (1 if 'e2' in x else (2 if 'e1' in x else 100)))
+
+    # Only keep the first two elements of V4 split by '_'
+    df.loc[:, 'V4'] = df['V4'].astype(str).apply(lambda x: '_'.join(x.split('_')[:2]))
 
     # change Timed column to numeric values
     df.loc[:, 'Timed'] = df['Timed'].map({'yesterday': 0, 'one_week': 1, 'two_weeks': 2, 'never': 100})
     df = df.copy()
-
-    # Add true time column 1 if e3 in V4, 7 if e2 in V4, 14 if e1 in V4
-    df.loc[:, 'True Time'] = df['V4'].map(lambda x: 0 if 'e3' in x else (1 if 'e2' in x else (2 if 'e1' in x else 100)))
 
     # remove 'Distance : ' from V10 and convert to float
     df['Distance'] = df['V10'].str.replace('Distance :', '').astype(float)

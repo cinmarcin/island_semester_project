@@ -57,7 +57,11 @@ for config_file in config_files:
         # Save results
         if SAVE_RSA:
             temporal_rdm, filtered_trials = get_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
-            spatial_rdm, _ = get_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
+            spatial_rdm, _= get_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
+            # check that all trials are in design matrix columns
+            for trial in filtered_trials:
+                if not any(str(trial) in col for col in fmri_glm.design_matrices_[0].columns):
+                    raise ValueError(f"Trial {trial} from metadata not found in design matrix columns.")
             pre_rsa, post_rsa = compute_rsa_from_glm(fmri_glm, SUB, filtered_trials, pre_save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre'), n_repetitions=6)
             contrast_rsa = post_rsa - pre_rsa
             np.save(get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post'), contrast_rsa)

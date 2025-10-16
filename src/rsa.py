@@ -1,10 +1,8 @@
-from operator import sub
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import pandas as pd
-from tqdm import tqdm
 from utils.judgment_distances import load_memory_data
+import re
 
 def create_index_rdm(n_trials, repetitions, relative_distance=False, save_fig=False):
     """
@@ -78,7 +76,7 @@ def correlation_within_repetitions(correlation_matrix, trial_per_repetition=64, 
     print(f"Overall average correlation within all repetitions: {overall_avg_correlation:.4f}")
     return overall_avg_correlation
 
-def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None):
+def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None, rep=None):
     """
     Extract beta maps for specified trial indices from a fitted GLM model.
     
@@ -90,6 +88,8 @@ def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None):
         List of trial labels to extract. If None, all trials are extracted.
     run_label : str, optional
         Label for the run (e.g., 'pre' or 'post') to filter trials. If None, no filtering is applied.
+    rep : str, optional
+        Specific repetition to filter trials (e.g., 'rep1'). If None, no filtering is applied.
     
     Returns
     -------
@@ -97,18 +97,31 @@ def extract_beta_maps(fmri_glm, filter_labels=None, run_label=None):
         Dictionary mapping trial names to flattened beta maps (1D arrays).
     """
     print("Extracting beta maps...")
+    if rep == None:
+        rep = 'rep'
     exclude = ['derivative', 'dispersion']
     # Get column names
     columns = fmri_glm.design_matrices_[0].columns
+    # check that all filter_labels are in columns
+    if filter_labels is not None:
+        missing_labels = [label for label in filter_labels if not any(label in col for col in columns)]
+        if missing_labels:
+            raise ValueError(f"The following filter_labels are not found in the design matrix columns: {missing_labels}")
     # Only keep columns if contains any of the filter_labels
     if filter_labels is not None:
-        idxs = [i for i, col in enumerate(columns) 
-                if run_label in col and ".jpg" in col 
-                and any(label in col for label in filter_labels) 
-                and all(e not in col for e in exclude)]
+        idxs = [
+            i for i, col in enumerate(columns)
+            if run_label in col
+            and rep in col
+            and any(
+                label == re.sub(f"{run_label}_|{rep}\\d+_", "", col)
+                for label in filter_labels
+            )
+            and all(e not in col for e in exclude)
+        ]
     else:
         idxs = [i for i, col in enumerate(columns) 
-                if run_label in col and ".jpg" in col 
+                if run_label in col and rep in col 
                 and all(e not in col for e in exclude)]
 
     beta_maps_dict = {}
@@ -191,7 +204,7 @@ def get_model_rdm(sub: str, spatial=True, min_confidence=0, save_path=None):
 
     return dist_matrix, filtered_trials
 
-def compute_rsa(beta_maps_dict, save_path=None):
+def compute_rsa(beta_maps_dict, save_path=None, single_repetition=False):
     """
     Compute Representational Similarity Analysis (RSA) by spearman correlating beta maps. 
     Only correlate the beta map of a trial with every other trial in every other repetition.
@@ -211,6 +224,9 @@ def compute_rsa(beta_maps_dict, save_path=None):
     correlation_matrix = spearmanr(beta_maps, axis=1).correlation
     print(f"Computed correlation matrix with shape {correlation_matrix.shape}")
     n_repetitions, n_trials = 6, int(len(beta_maps_dict) / 6)
+    if single_repetition:
+        n_repetitions = 1
+        n_trials = len(beta_maps_dict)
     beta_maps_idxs = np.array([[i + r * n_trials for i in range(n_trials)] for r in range(n_repetitions)])
     # We only want to keep the correlations between different repetitions
     rsa_matrix = np.zeros((n_trials, n_trials))
@@ -219,7 +235,7 @@ def compute_rsa(beta_maps_dict, save_path=None):
             correlations = []
             for r1 in range(n_repetitions):
                 for r2 in range(n_repetitions):
-                    if r1 != r2:
+                    if single_repetition or r1 != r2: # only correlate different repetitions if not single_repetition
                         correlations.append(correlation_matrix[beta_maps_idxs[r1, i], beta_maps_idxs[r2, j]])
             rsa_matrix[i, j] = np.mean(correlations)
             rsa_matrix[j, i] = rsa_matrix[i, j]  # Symmetric matrix
@@ -318,7 +334,6 @@ def get_ordered_array_from_beta_dict(beta_maps_dict):
     unique_reps = sorted(list(set(reps)))
     unique_trials = sorted(list(set(trials)))
     print(f"Identified {len(unique_trials)} unique trials and {len(unique_reps)} unique repetitions.")
-    print(f"Unique trials: {unique_trials}")
     
     # Build beta array in order rep x trial
     beta_array = np.zeros((len(unique_reps) * len(unique_trials), len(next(iter(beta_maps_dict.values())))))
