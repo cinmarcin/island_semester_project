@@ -1,6 +1,10 @@
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+
+from src.utils.utils import make_dir
+
+
 def plot_avg_confidence(df, group_col, group_labels, title):
     """
     Plots average placement and seen-when confidence ratings for a binary grouping.
@@ -28,3 +32,39 @@ def plot_avg_confidence(df, group_col, group_labels, title):
     ax.legend()
     ax.bar_label(bars1, padding=3)
     ax.bar_label(bars2, padding=3)
+
+def plot_bar(labels, values, errors=None, title="", ylabel="Spearman ρ", path=None, ylim=(-1, 1), colors=None, scale=1e1):
+    plt.figure(figsize=(6, 4))
+    
+    # Handle NaNs and scale values
+    values = np.nan_to_num(values) * scale
+    if errors is not None:
+        errors = np.nan_to_num(errors) * scale
+
+    # Plot
+    plt.bar(labels, values, yerr=errors, capsize=5 if errors is not None else 0, color=colors)
+    plt.ylim(*ylim)
+    
+    # Label the axis with scale note
+    plt.ylabel(f"{ylabel} (×10⁻¹)")
+    plt.title(title)
+    
+    plt.grid(axis="y", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    
+    if path:
+        plt.savefig(path)
+    plt.close()
+
+def plot_split(sub, spat_low, spat_high, path):
+    plt.figure(figsize=(8, 4))
+    # Spatial
+    plt.bar(['Low', 'High'], [spat_low, spat_high], color=['salmon', 'red'])
+    plt.ylim(-1, 1)
+    plt.title(f"Spatial RDM ↔ RSA ({sub})")
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+
+    plt.tight_layout()
+    make_dir(path)
+    plt.savefig(os.path.join(path, f"{sub}_rsa_median_split.png"))
+    plt.close()

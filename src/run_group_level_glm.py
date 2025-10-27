@@ -1,11 +1,13 @@
-from contrast_types import ContrastType
 import os
 from nilearn.glm.second_level import SecondLevelModel, make_second_level_design_matrix
-from glm import create_group_mask
 from nilearn.reporting import make_glm_report
 from nilearn import image
 import argparse
 import yaml
+
+from src.core.glm import create_group_mask
+from src.core.contrast_types import ContrastType
+
 
 
 ## Controls

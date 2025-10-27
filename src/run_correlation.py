@@ -1,13 +1,15 @@
 import os
 from joblib import dump, load
-from contrast_types import ContrastType
 from tqdm import tqdm
-from rsa import create_index_rdm, correlation_accross_repetitions, correlation_within_repetitions, extract_beta_maps
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as mpatches
 import pandas as pd
 import seaborn as sns
+
+from src.core.contrast_types import ContrastType
+from src.core.rsa import correlation_accross_repetitions, correlation_within_repetitions, extract_beta_maps
+
 
 
 ## Controls

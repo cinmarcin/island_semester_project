@@ -1,15 +1,17 @@
 import os
-from utils.data import load_subject_data, remove_subject_data
-from glm import combined_first_level_analysis
-from rsa import compute_rsa_from_glm, get_model_rdm, create_rsa_figure
+import numpy as np
 from nilearn.reporting import make_glm_report
 from nilearn.plotting import plot_design_matrix
 from joblib import dump, load
-from contrast_types import ContrastType
 import argparse
 import yaml
-from paths import get_processed_data_file_path, get_processed_data_subject_folder, is_glm_computed, PRE_SES, POST_SES, get_model_rdm_path
-import numpy as np
+
+from src.data.paths import get_processed_data_file_path, get_processed_data_subject_folder, is_glm_computed, PRE_SES, POST_SES, get_model_rdm_path
+from src.core.contrast_types import ContrastType
+from src.data.data import load_subject_data, remove_subject_data
+from src.core.glm import combined_first_level_analysis
+from src.core.rsa import compute_rsa_from_glm, compute_model_rdm, create_rsa_figure
+
 
 ## --------- GET ARGUMENTS
 parser = argparse.ArgumentParser()
@@ -31,6 +33,7 @@ for config_file in config_files:
     P_VALUE = config["p_value"]
     HIPPOCAMPUS_ONLY = config.get("hippocampus_only", False)
     SAVE_RSA = config.get("save_rsa", False)
+    EUCLIDEAN_RSA = config.get("euclidean_rsa", False)
 
     print(f"Running GLM for {SUB} with config {config_file}")
     if SAVE_RSA:
@@ -56,16 +59,20 @@ for config_file in config_files:
         
         # Save results
         if SAVE_RSA:
-            temporal_rdm, filtered_trials = get_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
-            spatial_rdm, _= get_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
+            temporal_rdm, filtered_trials = compute_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
+            spatial_rdm, _= compute_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
             # check that all trials are in design matrix columns
             for trial in filtered_trials:
                 if not any(str(trial) in col for col in fmri_glm.design_matrices_[0].columns):
                     raise ValueError(f"Trial {trial} from metadata not found in design matrix columns.")
-            pre_rsa, post_rsa = compute_rsa_from_glm(fmri_glm, SUB, filtered_trials, pre_save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre'), n_repetitions=6)
-            contrast_rsa = post_rsa - pre_rsa
-            np.save(get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post'), contrast_rsa)
-            create_rsa_figure(contrast_rsa, f"{SUB} RSA Pre-Post Contrast", save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post').with_suffix('.png'))
+                
+            reps = ['all_reps', 'rep1', 'rep2', 'rep3', 'rep4', 'rep5', 'rep6']
+            for rep in reps:
+                pre_rsa, post_rsa = compute_rsa_from_glm(fmri_glm, SUB, filtered_trials, pre_save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre'), n_repetitions=6, rep = rep, euclidean=EUCLIDEAN_RSA)
+                contrast_rsa = post_rsa - pre_rsa
+                pre_post_save_path = str(get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre-post')).replace('.npy',f'_{rep}{"_euclidean" if EUCLIDEAN_RSA else ""}.npy')
+                np.save(pre_post_save_path, contrast_rsa)
+                create_rsa_figure(pre_rsa, f"{SUB} RSA Pre Session for {rep}", save_path = pre_post_save_path.replace('.npy', '.png'))
         else:
             dump(fmri_glm, get_processed_data_file_path(config_file=config_file, analysis='glm', sub=SUB, config=config))
 

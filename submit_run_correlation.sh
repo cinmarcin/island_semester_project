@@ -7,8 +7,8 @@
 #SBATCH --mem=64G
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8              # Adjust CPU allocation if needed
-#SBATCH --output=logs/rsa_job.out    # Output log file
-#SBATCH --error=logs/rsa_job.err     # Error log file
+#SBATCH --output=logs/correlation_job.out    # Output log file
+#SBATCH --error=logs/correlation_job.err     # Error log file
 
 cd ~/island_semester_project
 
@@ -17,4 +17,4 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate miplab_env
 
 # Run your Python script
-python src/run_correlation.py 
+python -m src.run_correlation

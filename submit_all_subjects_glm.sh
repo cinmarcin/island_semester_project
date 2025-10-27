@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=run_glm
-#SBATCH --time=03:00:00
+#SBATCH --time=10:00:00
 #SBATCH --account=cs-503
 #SBATCH --qos=cs-503
 #SBATCH --gres=gpu:2
@@ -56,6 +56,6 @@ echo "Using config files: ${CONFIG_FILES[@]}"
 # Run GLM for assigned subjects
 for ((i=$START; i<=$END; i++)); do
     SUBJECT=${SUBS[$i]}
-    echo "Running GLM for $SUBJECT"
-    python src/run_subject_level_glm.py --sub "$SUBJECT" --config "${CONFIG_FILES[@]}"
+    echo "------------------ Running GLM for $SUBJECT"
+    python -m src.run_subject_level_glm --sub "$SUBJECT" --config "${CONFIG_FILES[@]}"
 done
