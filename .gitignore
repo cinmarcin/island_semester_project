@@ -83,7 +83,9 @@ profile_default/
 ipython_config.py
 
 # Data
-data/
+data/preprocessed
+data/processed
+data/raw
 
 # Logs
 logs/
