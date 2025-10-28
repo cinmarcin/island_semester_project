@@ -32,9 +32,9 @@ HEIGHT_CONTROLS_AND_P_VALUES = {"fdr": 0.05,
 
 CONTRAST_PATH_ENDINGS= [f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}pre_contrast.nii.gz',
                         f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}post_contrast.nii.gz',
-                        f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}pre_post_contrast.nii.gz']
-DATA_PATH = f"data/processed/glm/{config_file.split('/')[-1].replace('.yaml','')}"
-REPORT_PATH = f"reports/glm/{CONTRAST_TYPE.value}/{config_file.split('/')[-1].replace('.yaml','')}/group_level"
+                        f'_smooth_{SMOOTHING_FWHM}_{CONTRAST_TYPE.value}_{"hippo_" if HIPPOCAMPUS_ONLY else ""}pre-post_contrast.nii.gz']
+DATA_PATH = f"data/processed/{config_file.split('/')[-1].replace('.yaml','')}"
+REPORT_PATH = f"reports/{config_file.split('/')[-1].replace('.yaml','')}/group_level"
 if not os.path.exists(REPORT_PATH):
     os.makedirs(REPORT_PATH)
 
