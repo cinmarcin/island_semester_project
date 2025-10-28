@@ -9,6 +9,7 @@ _CONTRAST_MAP = {
     "per_trial": (".jpg", "NONE"),
     "order": ("_", "NONE"),
     "new_faces_vs_objects": ("_h_v1_new", "_o_v1_new"),
+    "random": ("random1", "random2"),
 }
 
 def transform_trial_to_contrast(events, c1: str, c2: str):
@@ -28,6 +29,19 @@ def transform_trial_to_contrast(events, c1: str, c2: str):
         # apply to create trial_type column
         events['trial_type'] = events['trial_type'].apply(trial_type_with_rep)
         return events
+    
+    elif c1 == 'random1' and c2 == 'random2':
+        first_rep = events.head(64).copy()
+        classes = controlled_randomization_of_trials(first_rep)
+        mapping = dict(zip(classes['trial_type'], classes['group']))
+        # apply to all events
+        events['trial_type'] = events['trial_type'].map(mapping).fillna(events['trial_type'])
+        # check nas 
+        if events['trial_type'].isna().any():
+            unmatched = events.loc[events['trial_type'].isna(), 'trial_type'].unique()
+            print(f"Found trials that don't belong to 'random1' or 'random2': {unmatched}")
+        return events
+
 
     mask1 = events['trial_type'].str.contains(c1, case=False, na=False)
     mask2 = events['trial_type'].str.contains(c2, case=False, na=False)
@@ -66,6 +80,7 @@ class ContrastType(Enum):
     PER_TRIAL = "per_trial"
     ORDER = "order"
     NEW_FACES_VS_OBJECTS = "new_faces_vs_objects"
+    RANDOM = "random"
 
     # --- helper maps for contrasts ---
 
@@ -124,3 +139,39 @@ class ContrastType(Enum):
                 }
         else:
             return self._build_weights(columns, (c1, c2), exclude_terms)
+
+
+def controlled_randomization_of_trials(events, n_bins=4, seed=42):
+    import numpy as np
+
+    # --- Extract categorical ---
+    events['category'] = events['trial_type'].str.extract(r'^(maya|wealth|pirate|food|drink|viking)')
+    events['r_nr'] = events['trial_type'].str.extract(r'_(r|nr)_')
+    events['o_h'] = events['trial_type'].str.extract(r'_(o|h)_')
+    events['old_new'] = events['trial_type'].apply(lambda x: 'old' if 'old' in x else 'new')
+
+    # --- Bin continuous ---
+    events['onset_bin'] = pd.qcut(events['onset'], q=min(n_bins, len(events)), duplicates='drop')
+    events['duration_bin'] = pd.qcut(events['duration'], q=min(n_bins, len(events)), duplicates='drop')
+
+    # --- Stratification code (categorical + binned continuous) ---
+    events['stratum'] = (events['category'].astype(str) + "_" +
+                         events['r_nr'].astype(str) + "_" +
+                         events['o_h'].astype(str) + "_" +
+                         events['old_new'].astype(str) + "_" +
+                         events['onset_bin'].astype(str) + "_" +
+                         events['duration_bin'].astype(str))
+
+    # --- Shuffle globally ---
+    events = events.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    # --- Assign group by exact half ---
+    n_trials = len(events)
+    half = n_trials // 2
+    events['group'] = ['random1']*half + ['random2']*(n_trials - half)
+
+    # --- Verify ---
+    print(events['group'].value_counts())
+    print(events.groupby(['group', 'category', 'r_nr', 'o_h', 'old_new']).size().unstack(fill_value=0))
+
+    return events
