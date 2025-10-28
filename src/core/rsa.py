@@ -433,11 +433,11 @@ def run_subject_level_rsa(sub, config, config_file, rep='all_reps', only_post_se
         return spearmanr(x, y).correlation, spearmanr(x, y).pvalue
 
     # Spatial low/high correlations
-    corr_spat_low = safe_spearman(rsa_vals[spat_low_mask], spatial_vals[spat_low_mask])
-    corr_spat_high = safe_spearman(rsa_vals[spat_high_mask], spatial_vals[spat_high_mask])
+    corr_spat_low = np.mean(rsa_vals[spat_low_mask])
+    corr_spat_high = np.mean(rsa_vals[spat_high_mask])
 
-    print(f"Spatial  RDM ↔ RSA (low dist):   ρ = {np.nan_to_num(corr_spat_low[0]):.4f}, p = {np.nan_to_num(corr_spat_low[1]):.4f}")
-    print(f"Spatial  RDM ↔ RSA (high dist):  ρ = {np.nan_to_num(corr_spat_high[0]):.4f}, p = {np.nan_to_num(corr_spat_high[1]):.4f}")
+    print(f"Spatial  RDM ↔ RSA (low dist):   ρ = {np.nan_to_num(corr_spat_low):.4f}")
+    print(f"Spatial  RDM ↔ RSA (high dist):  ρ = {np.nan_to_num(corr_spat_high):.4f}")
 
     return (corr_temp, z_temp, corr_spat, z_spat, tempo_spatial_corr,
             corr_spat_low, corr_spat_high)
@@ -513,8 +513,12 @@ def summarize_results(name, results):
 
 # summarize high/low splits
 def summarize_split(name, results_low, results_high):
-    mean_low, sem_low = mean_sem([results_low[s][0] for s in results_low])
-    mean_high, sem_high = mean_sem([results_high[s][0] for s in results_high])
+    from scipy.stats import sem
+    mean_low = np.mean([results_low[s] for s in results_low])
+    sem_low = sem([results_low[s] for s in results_low])
+
+    mean_high = np.mean([results_high[s] for s in results_high])
+    sem_high = sem([results_high[s] for s in results_high])
     print(f"\n{name} (median split):")
     print(f"  Low-dist mean ρ = {mean_low:.4f} ± {sem_low:.4f} (SEM)")
     print(f"  High-dist mean ρ = {mean_high:.4f} ± {sem_high:.4f} (SEM)")
@@ -621,8 +625,8 @@ def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_sp
         )
         plot_split(
             sub=sub,
-            spat_low=results["spat_low"][sub][0],
-            spat_high=results["spat_high"][sub][0],
+            spat_low=results["spat_low"][sub],
+            spat_high=results["spat_high"][sub],
             path=sub_folder
         )
     # --- Group-level bar plot
@@ -657,9 +661,13 @@ def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_sp
     )
     # --- Group-level median split
     def group_mean_sem(low_dict, high_dict):
-        m_low, s_low = mean_sem([low_dict[s][0] for s in subs])
-        m_high, s_high = mean_sem([high_dict[s][0] for s in subs])
-        return [m_low, m_high], [s_low, s_high]
+        from scipy.stats import sem
+        mean_low = np.mean([low_dict[s] for s in subs])
+        sem_low = sem([low_dict[s] for s in subs])
+
+        mean_high = np.mean([high_dict[s] for s in subs])
+        sem_high = sem([high_dict[s] for s in subs])
+        return [mean_low, mean_high], [sem_low, sem_high]
 
     spat_vals, spat_err = group_mean_sem(results["spat_low"], results["spat_high"])
 
