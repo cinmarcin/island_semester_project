@@ -17,8 +17,8 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate miplab_env
 
 # Run your Python script
-python -m src.run_rsa --config configs/order_hippocampus_euclidean.yaml
-python -m src.run_rsa --config configs/order_hippocampus_euclidean.yaml --only_post_session
+# python -m src.run_rsa --config configs/order_hippocampus_euclidean.yaml
+# python -m src.run_rsa --config configs/order_hippocampus_euclidean.yaml --only_post_session
 python -m src.run_rsa --config configs/order_hippocampus.yaml
-python -m src.run_rsa --config configs/order_hippocampus.yaml --only_post_session
+# python -m src.run_rsa --config configs/order_hippocampus.yaml --only_post_session
 

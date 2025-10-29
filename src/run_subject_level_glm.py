@@ -20,7 +20,7 @@ parser.add_argument("--config", type=str, nargs='+', required=True, help="Path(s
 args = parser.parse_args()
 SUB = args.sub
 config_files = args.config
-
+PER_REP = False
 # --------- RUN GLM FOR EACH CONFIG
 for config_file in config_files:
     with open(config_file, "r") as f:
@@ -59,14 +59,16 @@ for config_file in config_files:
         
         # Save results
         if SAVE_RSA:
-            temporal_rdm, filtered_trials = compute_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
-            spatial_rdm, _= compute_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
+            temporal_rdm, _ = compute_model_rdm(SUB, spatial=False, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=False, config_file=config_file, config=config))
+            spatial_rdm, filtered_trials = compute_model_rdm(SUB, spatial=True, min_confidence=0, save_path=get_model_rdm_path(sub=SUB, spatial=True, config_file=config_file, config=config))
             # check that all trials are in design matrix columns
             for trial in filtered_trials:
                 if not any(str(trial) in col for col in fmri_glm.design_matrices_[0].columns):
                     raise ValueError(f"Trial {trial} from metadata not found in design matrix columns.")
                 
             reps = ['all_reps', 'rep1', 'rep2', 'rep3', 'rep4', 'rep5', 'rep6']
+            if not PER_REP:
+                reps = ['all_reps']
             for rep in reps:
                 pre_rsa, post_rsa = compute_rsa_from_glm(fmri_glm, SUB, filtered_trials, pre_save_path=get_processed_data_file_path(config_file=config_file, analysis='rsa', sub=SUB, config=config, session='pre'), n_repetitions=6, rep = rep, euclidean=EUCLIDEAN_RSA)
                 contrast_rsa = post_rsa - pre_rsa

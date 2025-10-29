@@ -178,11 +178,15 @@ def compute_model_rdm(sub: str, spatial=True, min_confidence=0, save_path=None):
     # Filter for only correctly classified as old trials
     df = sub_df[(sub_df['Classified as old'] == 1) & (sub_df['Old'] == 1)].copy()
 
+    # Define min confidence as median confidence
+    # median_spatial_confidence = df['Placed Confidence'].median()
+    # print(f"Subject {sub} median spatial confidence: {median_spatial_confidence}")
+    # df = df[df['Placed Confidence'] >= median_spatial_confidence]
+
     filtered_trials = df['V4'].copy()
     print(f"Subject {sub} has {len(filtered_trials)} trials after filtering for correctly classified old items.")
 
     if spatial:
-        df = df[df['Placed Confidence'] >= min_confidence]
         df = df[['X', 'Y', 'Z', 'Placed Confidence']]
         judged_positions = df[['X', 'Y', 'Z']].to_numpy()
     else:
@@ -585,7 +589,7 @@ def second_level_sign_flip(z_values, n_perm=10000, random_state=None):
         "null_means": null_means
     }
 
-def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_spatial, second_level_results_temporal):
+def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_spatial, second_level_results_temporal, euclidean=False):
     
         # --- Print summary
     print("\n" + "="*70)
@@ -676,6 +680,15 @@ def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_sp
 
     plt.figure(figsize=(6, 4))  # Adjusted size since we have only 1 plot
 
+    if euclidean:
+        metric = "Euclidean"
+        scale = 1e-4
+        ylim = None
+    else:
+        metric = "Spearman ρ (×10⁻¹)"
+        scale = 1e1
+        ylim = (-1, 1)
+
     vals, errs, title, colors = spat_vals, spat_err, "Spatial RDM ↔ RSA", ['salmon', 'red']
 
     plt.bar(['Low', 'High'],
@@ -684,8 +697,8 @@ def plot_and_save_rsa_results(results, figure_dir, subs, second_level_results_sp
             capsize=5,
             color=colors)
 
-    plt.ylim(-1, 1)
-    plt.ylabel("Spearman ρ (×10⁻¹)")
+    plt.ylim(ylim)
+    plt.ylabel(metric)
     plt.title(title)
     plt.grid(axis='y', linestyle='--', alpha=0.5)
 

@@ -24,6 +24,7 @@ def main():
     config_file = args.config
     config = load_config(config_file)
     ONLY_POST_SESSION = args.only_post_session
+    PRE_REP = False
 
     # --- Output directory
     figure_dir = f"figures/rsa/{os.path.basename(config_file).replace('.yaml', '')}/"
@@ -65,6 +66,8 @@ def main():
                     'sub-P51',  
                     ]
     reps = ['all_reps', 'rep1', 'rep2', 'rep3', 'rep4', 'rep5', 'rep6']
+    if not PRE_REP:
+        reps = ['all_reps']
     for rep in reps:
         print(f"Running RSA analysis for repetition: {rep}")
         run_label = 'post' if ONLY_POST_SESSION else 'pre-post'
