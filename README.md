@@ -12,6 +12,19 @@ This repository contains the  analysis code for the "Island" experiment, develop
 - Analysis in this repository focuses on first-level GLM analyses of the fMRI data and Representational Similarity Analysis (RSA) derived from GLM betas, plus correlation / group-level statistics.
 
 ---
+## Example Outputs
+### Group level Faces vs Object contrast map
+<img width="1650" height="439" alt="image" src="https://github.com/user-attachments/assets/ed2e65bf-264e-46a2-ae36-5bc45f2e3f44" />
+
+### Neuronal (left) and Spatial Model (right) RDM for RSA analysis
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4519ee5b-a4ba-4fd1-9425-c7dab390cd43" 
+       alt="Neuronal RDM for sub-10" 
+       width="45%" />
+  <img src="https://github.com/user-attachments/assets/7f3fb7e2-9070-47b3-974a-a41b9d9138e9" 
+       alt="Spatial Model RDM for sub-10" 
+       width="45%" />
+</p>
 
 ## Repository layout
 
@@ -118,6 +131,5 @@ This code was done to be as reproducible as possible, but a semester project is 
 Oskar.Boesch@epfl.ch
 
 ---
-# island_semester_project
-
+## Bilbiography
 This project is strongly inspired by the work of Deuker et al. (2016), An event map of memory space in the hippocampus (https://elifesciences.org/articles/16534).
