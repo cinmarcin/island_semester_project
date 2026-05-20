@@ -87,17 +87,16 @@ def download_subject_data(sub):
 
 def remove_subject_data(sub):
     """
-    Remove local fMRI data and necessary files for a given subject.
-    Args:
-        sub (str): Subject identifier (e.g., 'sub-P10').
+    Disabled for safety.
+
+    The project now reads fMRI data directly from shared RCPNAS symlinks.
+    We must never remove files from data/fmriprep_output, data/bids_ackbar,
+    or any shared dataset folder.
     """
-    local_base_path = os.path.join(FMRI_PREP_OUTPUT_PATH, sub)
-    if os.path.exists(local_base_path):
-        print(f"Removing local data for {sub} at {local_base_path}...")
-        os.system(f"rm -rf {local_base_path}")
-        print(f"Removed local data for {sub}.")
-    else:
-        print(f"No local data found for {sub} at {local_base_path}.")
+    print(
+        f"Skipping removal for {sub}. "
+        "Data are read from shared symlinks and must not be deleted."
+    )
 
 def download_event_file(sub, session):
     raise RuntimeError(
