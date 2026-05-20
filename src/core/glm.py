@@ -36,7 +36,7 @@ def create_gm_mask(func_img):
     Returns:
         gm_mask_img (nibabel.Nifti1Image): Resampled gray matter mask image.
     """
-    gm_mask = datasets.load_mni152_gm_mask(resolution=2.5, threshold=0.2, n_iter=2)
+    gm_mask = datasets.load_mni152_gm_mask(resolution=2, threshold=0.2, n_iter=2)
     gm_mask_resampled = image.resample_to_img(gm_mask, func_img, interpolation='nearest', force_resample=True, copy_header=True)
     gm_mask_img = nib.Nifti1Image((gm_mask_resampled.get_fdata() > 0).astype(int), gm_mask_resampled.affine, gm_mask_resampled.header)
     return gm_mask_img
@@ -60,7 +60,7 @@ def create_hippocampal_gm_mask(func_img):
     hippocampus_mask_img = nib.Nifti1Image(hippocampus_mask_data.astype(np.uint8), atlas_img.affine)
 
     # Load MNI gray matter mask
-    gm_mask_img = datasets.load_mni152_gm_mask(resolution=2.5, threshold=0.2, n_iter=2)
+    gm_mask_img = datasets.load_mni152_gm_mask(resolution=2, threshold=0.2, n_iter=2)
 
     # Resample hippocampal mask to GM mask space
     hippocampus_resampled = image.resample_to_img(hippocampus_mask_img, gm_mask_img, interpolation='nearest', force_resample=True, copy_header=True)
