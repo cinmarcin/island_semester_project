@@ -19,3 +19,8 @@ __pycache__/
 .DS_Store
 .env
 .venv/
+
+# External dataset symlinks
+data/bids_ackbar
+data/fmriprep_output
+data/fmriprep_output_native
