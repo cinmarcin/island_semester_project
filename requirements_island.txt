@@ -1,0 +1,26 @@
+# Core scientific stack
+numpy>=1.23
+pandas>=1.5
+scipy>=1.9
+scikit-learn>=1.1
+joblib>=1.2
+
+# Neuroimaging
+nibabel>=4.0
+nilearn>=0.10
+
+# Plotting and notebooks
+matplotlib>=3.6
+seaborn>=0.12
+jupyter>=1.0
+jupyterlab>=3.6
+notebook>=6.5
+ipykernel>=6.0
+ipywidgets>=8.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.64
+
+# Development / optional checks
+pytest>=7.0

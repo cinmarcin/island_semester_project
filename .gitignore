@@ -1,26 +1,34 @@
-# Large external data symlinks / outputs
-data/bids_ackbar/
-data/fmriprep_output/
-data/fmriprep_output_native/
-data/fmriprep_output_mni/
-data/processed/
-logs/
-
-# Optional generated outputs
+# Data and generated outputs
+data/
 figures/
 reports/
+logs/
 
-# Python / notebooks
+# Python / Jupyter
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+*.nbconvert.ipynb
 
-# System / env
+# System / environments
 .DS_Store
 .env
 .venv/
+.vscode/
+.idea/
 
-# External dataset symlinks
-data/bids_ackbar
-data/fmriprep_output
-data/fmriprep_output_native
+# Neuroimaging / large binaries
+*.nii
+*.nii.gz
+*.mgz
+*.gii
+*.h5
+*.pkl
+*.pickle
+*.joblib
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.7z
